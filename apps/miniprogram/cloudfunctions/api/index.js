@@ -2489,6 +2489,15 @@ async function readableAvatarUrls(members) {
     return members;
   }
 }
+async function setAvatar(user, payload) {
+  const avatarUrl = normalizeAvatarUrl(payload.avatarUrl);
+  if (!avatarUrl) raise("INVALID_INPUT", "\u8BF7\u91CD\u65B0\u9009\u62E9\u5FAE\u4FE1\u5934\u50CF");
+  if (!user._id) raise("CLOUD_ERROR", "\u6210\u5458\u8BB0\u5F55\u4E0D\u5B58\u5728");
+  if (avatarUrl !== (user.avatarUrl || "")) {
+    await users().doc(user._id).update({ data: { avatarUrl } });
+  }
+  return avatarUrl;
+}
 async function listMembers(user) {
   const [members, inviteViews] = await Promise.all([
     listFamilyUsers(user.familyId),
@@ -2639,6 +2648,7 @@ async function dispatchWorkspace(user, action, payload) {
 async function dispatchAccount(user, action, payload) {
   if (action === "createInvite") return familyMutation(user, await createInvite(user, payload));
   if (action === "listMembers") return familyMutation(user, await listMembers(user));
+  if (action === "setAvatar") return familyMutation(user, await setAvatar(user, payload));
   if (action === "removeMember") {
     await removeMember(user, payload);
     return familyMutation(user, null);
@@ -2652,7 +2662,7 @@ async function handle(openid, unionid, action, payload) {
   const user = await requireUser(openid);
   if (action === "leaveFamily") return leaveFamily(user);
   if (action === "sync") return syncFamily(user, payload);
-  if (action === "createInvite" || action === "listMembers" || action === "removeMember") {
+  if (action === "createInvite" || action === "listMembers" || action === "removeMember" || action === "setAvatar") {
     return dispatchAccount(user, action, payload);
   }
   return dispatchWorkspace(user, action, payload);

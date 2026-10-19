@@ -83,6 +83,7 @@ Family（租户）
 | `sync` `{ version, familyId, role }` | 家庭成员 | 切页时轻量检查。版本、家庭、角色都没变返回 `{ changed: false }`，否则返回完整会话 |
 | `createInvite` `{ role }` | owner：parent/viewer；parent：viewer | 生成邀请码 |
 | `listMembers` | 家庭成员 | 成员 + 未过期邀请。返回前把 `avatarUrl` 的 `cloud://` 换成临时 https，其他成员才能显示头像 |
+| `setAvatar` `{ avatarUrl }` | 家庭成员 | 只补自己的头像，不改称呼和昵称。`avatarUrl` 必须是 `cloud://` 文件 ID，空值或外链拒绝 |
 | `removeMember` `{ openid }` | 仅 owner | 不能移自己或创建者 |
 | `leaveFamily` | parent、viewer | 自己退出，删掉自己的 `users` 记录，家庭数据留给其他人。创建者调用返回 `OWNER_CANNOT_LEAVE` |
 

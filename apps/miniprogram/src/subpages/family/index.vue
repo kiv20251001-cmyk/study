@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
-import { showCloudError } from '@/cloud/call'
+import { showCloudError, uploadAvatar } from '@/cloud/call'
 import { useFamilyPage } from '@/composables/useFamilyPage'
 import { usePageBackground, useThemePage } from '@/utils/wx-theme'
 import PageHeader from '@/components/PageHeader.vue'
@@ -29,6 +29,7 @@ const invites = ref<FamilyInviteView[]>([])
 const loading = ref(false)
 const loaded = ref(false)
 const inviting = ref('')
+const pickingAvatar = ref(false)
 const inviteRole = ref<InviteRole>(store.canInviteParent ? 'parent' : 'viewer')
 const roleTabs = computed(() => [
   ...(store.canInviteParent ? [{ role: 'parent' as const, label: '邀请家长' }] : []),
@@ -131,6 +132,23 @@ function remove(member: FamilyMemberView) {
   })
 }
 
+/** 还没有头像时，点自己的色块用微信选一张。上传后其他成员刷新成员页就能看到。 */
+async function onChooseAvatar(event: { detail?: { avatarUrl?: string } }) {
+  const file = event.detail?.avatarUrl
+  if (!file || pickingAvatar.value) return
+  pickingAvatar.value = true
+  try {
+    const avatarUrl = await uploadAvatar(file)
+    await store.setAvatar(avatarUrl)
+    await refreshRoster()
+    uni.showToast({ icon: 'none', title: '头像已更新' })
+  } catch (error) {
+    showCloudError(error)
+  } finally {
+    pickingAvatar.value = false
+  }
+}
+
 function leave() {
   if (!store.canLeave) return
   uni.showModal({
@@ -183,6 +201,15 @@ function leave() {
         </template>
         <view v-for="member in members" :key="member.openid" class="member">
           <image v-if="member.avatarUrl" class="avatar photo" :src="member.avatarUrl" mode="aspectFill" />
+          <button
+            v-else-if="member.self"
+            class="avatar pickable"
+            :class="[member.role, { busy: pickingAvatar }]"
+            hover-class="press-on"
+            hover-stay-time="80"
+            open-type="chooseAvatar"
+            @chooseavatar="onChooseAvatar"
+          >{{ memberTitle(member).name.slice(0, 1) }}</button>
           <view v-else class="avatar" :class="member.role">{{ memberTitle(member).name.slice(0, 1) }}</view>
           <view class="member-copy">
             <view class="name-row">
@@ -190,7 +217,7 @@ function leave() {
               <text v-if="memberTitle(member).tag" class="name-tag">{{ memberTitle(member).tag }}</text>
               <text v-if="member.self" class="name-self">· 我</text>
             </view>
-            <text class="muted">{{ FAMILY_ROLE_LABEL[member.role] }}</text>
+            <text class="muted">{{ FAMILY_ROLE_LABEL[member.role] }}{{ member.self && !member.avatarUrl ? ' · 点头像设置' : '' }}</text>
           </view>
           <button hover-class="press-on" hover-stay-time="80" v-if="store.canRemove(member)" class="ghost" @click="remove(member)">移出</button>
           <button hover-class="press-on" hover-stay-time="80" v-else-if="member.self && store.canLeave" class="ghost" @click="leave">退出</button>
@@ -304,6 +331,12 @@ function leave() {
 .avatar.owner { background: linear-gradient(135deg, #ffb45c, #f15a36); }
 .avatar.parent { background: linear-gradient(135deg, #5d9cff, #3c6fe0); }
 .avatar.viewer { background: linear-gradient(135deg, #39c6a4, #1fa98c); }
+.avatar.pickable {
+  flex: 0 0 auto;
+  padding: 0;
+  line-height: 40px;
+}
+.avatar.pickable.busy { opacity: 0.6; }
 .member-copy { flex: 1; min-width: 0; }
 .avatar-sk { width: 40px; height: 40px; border-radius: 14px; }
 .code-sk { margin-left: auto; margin-right: auto; }

@@ -272,6 +272,11 @@ export const useFamilyStore = defineStore('family', {
     listMembers() {
       return this.dispatch<FamilyRoster>('listMembers')
     },
+    /** 只补自己的微信头像。入库的是 cloud:// 文件 ID，成员列表再换成其他人也能看的临时链接。 */
+    async setAvatar(avatarUrl: string) {
+      const saved = await this.dispatch<string>('setAvatar', { avatarUrl })
+      this.avatarUrl = saved || avatarUrl
+    },
     createInvite(role: InviteRole) {
       return this.dispatch<FamilyInviteView>('createInvite', { role })
     },

@@ -431,6 +431,17 @@ async function readableAvatarUrls(members: FamilyMemberView[]) {
   }
 }
 
+/** 登录时没选头像的成员，之后只补自己的头像，不改称呼和昵称。 */
+async function setAvatar(user: UserDoc, payload: Record<string, unknown>) {
+  const avatarUrl = normalizeAvatarUrl(payload.avatarUrl)
+  if (!avatarUrl) raise('INVALID_INPUT', '请重新选择微信头像')
+  if (!user._id) raise('CLOUD_ERROR', '成员记录不存在')
+  if (avatarUrl !== (user.avatarUrl || '')) {
+    await users().doc(user._id).update({ data: { avatarUrl } })
+  }
+  return avatarUrl
+}
+
 async function listMembers(user: UserDoc) {
   const [members, inviteViews] = await Promise.all([
     listFamilyUsers(user.familyId),
@@ -594,6 +605,7 @@ async function dispatchWorkspace(user: UserDoc, action: string, payload: Record<
 async function dispatchAccount(user: UserDoc, action: string, payload: Record<string, unknown>) {
   if (action === 'createInvite') return familyMutation(user, await createInvite(user, payload))
   if (action === 'listMembers') return familyMutation(user, await listMembers(user))
+  if (action === 'setAvatar') return familyMutation(user, await setAvatar(user, payload))
   if (action === 'removeMember') {
     await removeMember(user, payload)
     return familyMutation(user, null)
@@ -608,7 +620,7 @@ async function handle(openid: string, unionid: string, action: string, payload: 
   const user = await requireUser(openid)
   if (action === 'leaveFamily') return leaveFamily(user)
   if (action === 'sync') return syncFamily(user, payload)
-  if (action === 'createInvite' || action === 'listMembers' || action === 'removeMember') {
+  if (action === 'createInvite' || action === 'listMembers' || action === 'removeMember' || action === 'setAvatar') {
     return dispatchAccount(user, action, payload)
   }
   return dispatchWorkspace(user, action, payload)
