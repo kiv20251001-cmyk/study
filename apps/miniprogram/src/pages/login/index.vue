@@ -4,7 +4,7 @@ import { onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/un
 import { appShare, isMomentsPreview, momentsShare } from '@/utils/share'
 import { CHILD_AVATAR_OPTIONS } from '@server-domain/constants'
 import type { ChildAvatarKey } from '@server-domain/types'
-import { showCloudError, uploadAvatar } from '@/cloud/call'
+import { CloudError, showCloudError, uploadAvatar } from '@/cloud/call'
 import ChildAvatar from '@/components/ChildAvatar.vue'
 import { hasLocalSession, useFamilyStore } from '@/stores/family'
 import { usePageBackground, useThemePage } from '@/utils/wx-theme'
@@ -43,6 +43,8 @@ const submitting = ref(false)
 /** 有登录记录时首帧就显示骨架，避免先闪一下表单再跳走。 */
 const booting = ref(!store.ready && hasLocalSession())
 let resuming = false
+/** 选头像等系统页返回也会触发 onShow，同一个邀请码只向云端确认一次。 */
+let checkedInvite = ''
 const childPlaceholder = computed(() => avatarDefaultName(avatarKey.value))
 
 onLoad((query) => {
@@ -50,12 +52,16 @@ onLoad((query) => {
   if (!invite) return
   inviteCode.value = invite
   mode.value = 'join'
-  booting.value = false
+  booting.value = store.ready || hasLocalSession()
 })
 
 onShow(() => {
   if (isMomentsPreview()) return
   if (inviteCode.value) {
+    if (checkedInvite !== inviteCode.value) {
+      checkedInvite = inviteCode.value
+      void skipJoinedInvite(inviteCode.value)
+    }
     if (store.ready && !displayName.value && !Object.values(FAMILY_ROLE_LABEL).includes(store.displayName)) {
       displayName.value = store.displayName
     }
@@ -80,6 +86,31 @@ onShow(() => {
     resuming = false
   })
 })
+
+/**
+ * 「重新进入小程序」会按原入口重开，从邀请卡片进来的家人又会落到这里。
+ * 已经在邀请对应的家庭，或本机有家庭而邀请已失效时，直接回课表；邀请别的家庭才显示加入表单。
+ */
+async function skipJoinedInvite(code: string) {
+  const known = store.ready || hasLocalSession()
+  let status = 'invalid'
+  try {
+    status = (await store.previewInvite(code)).status
+  } catch {
+    // 邀请失效或网络失败，按「invalid」处理。
+  }
+  if (status === 'same' || (status === 'invalid' && known)) {
+    try {
+      if (!store.ready) await store.resume()
+      openTab('today')
+      return
+    } catch (error) {
+      const offline = error instanceof CloudError && error.code === 'CALL_FAILED'
+      if (known && !offline) store.logout()
+    }
+  }
+  booting.value = false
+}
 
 function showCreate() {
   mode.value = 'create'
