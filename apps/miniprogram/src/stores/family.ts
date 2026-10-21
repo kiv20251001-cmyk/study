@@ -32,6 +32,13 @@ import {
 
 const LOGGED_KEY = 'myhome.mp.logged'
 
+/**
+ * 这次冷启动已经问过云端，确认这个微信号没有家庭。
+ * 从微信「最近使用 / 搜索记录」删掉小程序会清掉 storage，本机标记没了不代表没登录过。
+ */
+let guestConfirmed = false
+let resumeTask: Promise<void> | null = null
+
 let inflight: Promise<unknown> | null = null
 
 /** 倒数第二个课程色从灰蓝、玫红换成 #DC5454，已保存的课跟着换，卡片渐变一起变。 */
@@ -192,6 +199,7 @@ export const useFamilyStore = defineStore('family', {
       this.syncedAt = Date.now()
     },
     applySession(data: CloudSession) {
+      guestConfirmed = false
       this.openid = data.openid
       this.familyId = data.familyId
       this.role = data.role || 'owner'
@@ -207,6 +215,7 @@ export const useFamilyStore = defineStore('family', {
       uni.setStorageSync(LOGGED_KEY, '1')
     },
     async dispatch<T>(action: string, payload?: Record<string, unknown>) {
+      if (!this.ready) await ensureSession()
       if (needsFamily()) {
         promptLogin()
         throw new CloudError('请先创建家庭', NEED_FAMILY)
@@ -394,7 +403,33 @@ export function hasLocalSession() {
   return uni.getStorageSync(LOGGED_KEY) === '1'
 }
 
-/** 既没有家庭、本机也没有登录记录：写操作要先创建家庭。 */
+/**
+ * 用 openid 向云端恢复家庭。有本机标记时照旧恢复；标记被清掉时也会问一次，避免用户重新选孩子。
+ * 没有家庭时记在本次进程里，不再反复请求，也不会新建家庭。网络失败不记成游客，下次打开再试。
+ */
+export function ensureSession() {
+  const store = useFamilyStore()
+  if (store.ready || guestConfirmed) return Promise.resolve()
+  if (!resumeTask) {
+    const hadLocal = hasLocalSession()
+    resumeTask = store.resume()
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        if (error instanceof CloudError && error.code === 'UNAUTHENTICATED') guestConfirmed = true
+        if (hadLocal) store.logout()
+      })
+      .finally(() => {
+        resumeTask = null
+      })
+  }
+  return resumeTask
+}
+
+/**
+ * 还没确认身份时不要当成游客：写操作会先等 ensureSession。
+ * 确认没有家庭之后，提交才引导去创建。
+ */
 export function needsFamily() {
-  return !useFamilyStore().ready && !hasLocalSession()
+  if (useFamilyStore().ready || hasLocalSession()) return false
+  return guestConfirmed
 }

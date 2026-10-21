@@ -4,9 +4,9 @@ import { onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/un
 import { appShare, isMomentsPreview, momentsShare } from '@/utils/share'
 import { CHILD_AVATAR_OPTIONS } from '@server-domain/constants'
 import type { ChildAvatarKey } from '@server-domain/types'
-import { CloudError, showCloudError, uploadAvatar } from '@/cloud/call'
+import { showCloudError, uploadAvatar } from '@/cloud/call'
 import ChildAvatar from '@/components/ChildAvatar.vue'
-import { hasLocalSession, useFamilyStore } from '@/stores/family'
+import { ensureSession, hasLocalSession, useFamilyStore } from '@/stores/family'
 import { usePageBackground, useThemePage } from '@/utils/wx-theme'
 import { FAMILY_ROLE_LABEL, normalizeInviteCode } from '@/domain/family-account'
 import { avatarDefaultName } from '@/domain/avatar-names'
@@ -40,8 +40,8 @@ const nickName = ref('')
 /** 刚选的头像是本地临时路径，提交时才传到云存储；已有家庭时预填 cloud:// 文件 ID。 */
 const userAvatar = ref('')
 const submitting = ref(false)
-/** 有登录记录时首帧就显示骨架，避免先闪一下表单再跳走。 */
-const booting = ref(!store.ready && hasLocalSession())
+/** 身份还没从云端确认时先显示骨架，避免本地标记被清掉后先闪创建表单。 */
+const booting = ref(!store.ready)
 let resuming = false
 /** 选头像等系统页返回也会触发 onShow，同一个邀请码只向云端确认一次。 */
 let checkedInvite = ''
@@ -52,7 +52,7 @@ onLoad((query) => {
   if (!invite) return
   inviteCode.value = invite
   mode.value = 'join'
-  booting.value = store.ready || hasLocalSession()
+  if (!store.ready) booting.value = true
 })
 
 onShow(() => {
@@ -73,15 +73,12 @@ onShow(() => {
     openTab('today')
     return
   }
-  if (resuming || !hasLocalSession()) return
+  if (resuming) return
   resuming = true
   booting.value = true
-  store.resume().then(() => {
-    openTab('today')
-  }).catch((error) => {
-    store.logout()
-    booting.value = false
-    showCloudError(error)
+  ensureSession().then(() => {
+    if (store.ready) openTab('today')
+    else booting.value = false
   }).finally(() => {
     resuming = false
   })
@@ -92,7 +89,8 @@ onShow(() => {
  * 已经在邀请对应的家庭，或本机有家庭而邀请已失效时，直接回课表；邀请别的家庭才显示加入表单。
  */
 async function skipJoinedInvite(code: string) {
-  const known = store.ready || hasLocalSession()
+  if (!store.ready) await ensureSession()
+  const known = store.ready
   let status = 'invalid'
   try {
     status = (await store.previewInvite(code)).status
@@ -100,13 +98,9 @@ async function skipJoinedInvite(code: string) {
     // 邀请失效或网络失败，按「invalid」处理。
   }
   if (status === 'same' || (status === 'invalid' && known)) {
-    try {
-      if (!store.ready) await store.resume()
+    if (store.ready) {
       openTab('today')
       return
-    } catch (error) {
-      const offline = error instanceof CloudError && error.code === 'CALL_FAILED'
-      if (known && !offline) store.logout()
     }
   }
   booting.value = false
@@ -182,30 +176,18 @@ function cancel() {
 
 async function stayHome() {
   if (submitting.value) return
-  if (!store.ready && hasLocalSession()) {
-    submitting.value = true
-    try {
-      await store.resume()
-    } catch (error) {
-      store.logout()
-      showCloudError(error)
-      return
-    } finally {
-      submitting.value = false
-    }
+  submitting.value = true
+  try {
+    if (!store.ready) await ensureSession()
+  } finally {
+    submitting.value = false
   }
   if (store.ready) openTab('today')
 }
 
 /** 已有家庭时先说明后果。返回 false 表示这次不加入。 */
 async function confirmJoin(code: string) {
-  if (!store.ready && hasLocalSession()) {
-    try {
-      await store.resume()
-    } catch {
-      store.logout()
-    }
-  }
+  if (!store.ready) await ensureSession()
   if (!store.ready) return true
   const preview = await store.previewInvite(code)
   if (preview.status === 'new') return true
@@ -240,6 +222,11 @@ async function submit() {
       }
       await store.joinFamily(code, await memberProfile())
     } else {
+      if (!store.ready) await ensureSession()
+      if (store.ready) {
+        leave()
+        return
+      }
       const profile = await memberProfile()
       await store.login(cleanText(childName.value, TEXT_LIMIT.childName) || childPlaceholder.value, avatarKey.value, profile)
     }

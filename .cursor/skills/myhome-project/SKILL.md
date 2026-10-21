@@ -31,7 +31,7 @@ description: >-
 
 邀请码 6 位、24 小时、最多 10 次。分享路径是 `pages/login/index?invite=CODE`。
 
-已经登录过的手机用本机标记 `myhome.mp.logged` 恢复会话。恢复请求带 `resume: true`，没有家庭时不会偷偷新建。
+冷启动用 openid 调 `login { resume: true }` 恢复会话，没有家庭时不会偷偷新建。本机标记 `myhome.mp.logged` 只是上次成功的记录；从微信最近使用或搜索里删掉小程序会清掉这份缓存，不能据此当成已退出。
 
 ## 改代码放哪
 

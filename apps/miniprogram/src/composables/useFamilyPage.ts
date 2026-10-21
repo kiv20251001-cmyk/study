@@ -1,7 +1,7 @@
 import { onShow } from '@dcloudio/uni-app'
 import { CloudError, NOT_MEMBER } from '@/cloud/call'
 import { isMomentsPreview } from '@/utils/share'
-import { hasLocalSession, useFamilyStore } from '@/stores/family'
+import { ensureSession, useFamilyStore } from '@/stores/family'
 import { noticeNotMember } from '@/utils/login-prompt'
 import { useUiStore } from '@/stores/ui'
 
@@ -21,7 +21,6 @@ export function useFamilyPage() {
       syncFamily()
       return
     }
-    if (!hasLocalSession()) return
     ensureSession().then(() => {
       if (!store.ready) return
       ui.touchToday()
@@ -45,20 +44,3 @@ export function syncFamily(force = false) {
   })
 }
 
-let resumeTask: Promise<void> | null = null
-
-function ensureSession() {
-  const store = useFamilyStore()
-  if (store.ready || !hasLocalSession()) return Promise.resolve()
-  if (!resumeTask) {
-    resumeTask = store.resume()
-      .then(() => undefined)
-      .catch(() => {
-        store.logout()
-      })
-      .finally(() => {
-        resumeTask = null
-      })
-  }
-  return resumeTask
-}

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import { showCloudError, uploadAvatar } from '@/cloud/call'
 import { useFamilyPage } from '@/composables/useFamilyPage'
+import { ensureSession } from '@/stores/family'
 import { usePageBackground, useThemePage } from '@/utils/wx-theme'
 import PageHeader from '@/components/PageHeader.vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -49,12 +50,17 @@ onShow(() => {
     loaded.value = true
     return
   }
+  void openRoster()
+})
+
+async function openRoster() {
+  if (!store.ready) await ensureSession()
   if (!store.ready) {
     loaded.value = true
     return
   }
   refreshRoster()
-})
+}
 
 onShareTimeline(momentsShare)
 

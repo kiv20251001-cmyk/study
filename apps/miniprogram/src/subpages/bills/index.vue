@@ -8,6 +8,7 @@ import { CATEGORY_LABEL } from '@server-domain/constants'
 import { showCloudError } from '@/cloud/call'
 import { denyViewerBills } from '@/subpages/shared/useFamilyRole'
 import { useFamilyPage } from '@/composables/useFamilyPage'
+import { ensureSession } from '@/stores/family'
 import { usePageBackground, useThemePage, useThemeStore } from '@/utils/wx-theme'
 import { weekDates, weekLabel } from '@/utils/view'
 import AppIcon from '@/components/AppIcon.vue'
@@ -31,11 +32,16 @@ onLoad((query) => {
 })
 
 onShow(() => {
+  void refreshBills()
+})
+
+async function refreshBills() {
+  if (!store.ready) await ensureSession()
   if (!store.ready) return
   if (denyViewerBills()) return
   const period = anchor.value.slice(0, 7)
   store.generateBills(period).catch((error) => showCloudError(error))
-})
+}
 
 const range = computed(() => weekDates(anchor.value))
 const bills = computed(() =>
