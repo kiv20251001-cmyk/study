@@ -311,13 +311,160 @@ var require_dayjs_min = __commonJS({
   }
 });
 
+// ../../node_modules/dayjs/plugin/utc.js
+var require_utc = __commonJS({
+  "../../node_modules/dayjs/plugin/utc.js"(exports2, module2) {
+    !(function(t, i) {
+      "object" == typeof exports2 && "undefined" != typeof module2 ? module2.exports = i() : "function" == typeof define && define.amd ? define(i) : (t = "undefined" != typeof globalThis ? globalThis : t || self).dayjs_plugin_utc = i();
+    })(exports2, (function() {
+      "use strict";
+      var t = "minute", i = /[+-]\d\d(?::?\d\d)?/g, e = /([+-]|\d\d)/g;
+      return function(s, f, n) {
+        var u = f.prototype;
+        n.utc = function(t2) {
+          var i2 = { date: t2, utc: true, args: arguments };
+          return new f(i2);
+        }, u.utc = function(i2) {
+          var e2 = n(this.toDate(), { locale: this.$L, utc: true });
+          return i2 ? e2.add(this.utcOffset(), t) : e2;
+        }, u.local = function() {
+          return n(this.toDate(), { locale: this.$L, utc: false });
+        };
+        var r = u.parse;
+        u.parse = function(t2) {
+          t2.utc && (this.$u = true), this.$utils().u(t2.$offset) || (this.$offset = t2.$offset), r.call(this, t2);
+        };
+        var o = u.init;
+        u.init = function() {
+          if (this.$u) {
+            var t2 = this.$d;
+            this.$y = t2.getUTCFullYear(), this.$M = t2.getUTCMonth(), this.$D = t2.getUTCDate(), this.$W = t2.getUTCDay(), this.$H = t2.getUTCHours(), this.$m = t2.getUTCMinutes(), this.$s = t2.getUTCSeconds(), this.$ms = t2.getUTCMilliseconds();
+          } else o.call(this);
+        };
+        var a = u.utcOffset;
+        u.utcOffset = function(s2, f2) {
+          var n2 = this.$utils().u;
+          if (n2(s2)) return this.$u ? 0 : n2(this.$offset) ? a.call(this) : this.$offset;
+          if ("string" == typeof s2 && (s2 = (function(t2) {
+            void 0 === t2 && (t2 = "");
+            var s3 = t2.match(i);
+            if (!s3) return null;
+            var f3 = ("" + s3[0]).match(e) || ["-", 0, 0], n3 = f3[0], u3 = 60 * +f3[1] + +f3[2];
+            return 0 === u3 ? 0 : "+" === n3 ? u3 : -u3;
+          })(s2), null === s2)) return this;
+          var u2 = Math.abs(s2) <= 16 ? 60 * s2 : s2;
+          if (0 === u2) return this.utc(f2);
+          var r2 = this.clone();
+          if (f2) return r2.$offset = u2, r2.$u = false, r2;
+          var o2 = this.$u ? this.toDate().getTimezoneOffset() : -1 * this.utcOffset();
+          return (r2 = this.local().add(u2 + o2, t)).$offset = u2, r2.$x.$localOffset = o2, r2;
+        };
+        var h = u.format;
+        u.format = function(t2) {
+          var i2 = t2 || (this.$u ? "YYYY-MM-DDTHH:mm:ss[Z]" : "");
+          return h.call(this, i2);
+        }, u.valueOf = function() {
+          var t2 = this.$utils().u(this.$offset) ? 0 : this.$offset + (this.$x.$localOffset || this.$d.getTimezoneOffset());
+          return this.$d.valueOf() - 6e4 * t2;
+        }, u.isUTC = function() {
+          return !!this.$u;
+        }, u.toISOString = function() {
+          return this.toDate().toISOString();
+        }, u.toString = function() {
+          return this.toDate().toUTCString();
+        };
+        var l = u.toDate;
+        u.toDate = function(t2) {
+          return "s" === t2 && this.$offset ? n(this.format("YYYY-MM-DD HH:mm:ss:SSS")).toDate() : l.call(this);
+        };
+        var c = u.diff;
+        u.diff = function(t2, i2, e2) {
+          if (t2 && this.$u === t2.$u) return c.call(this, t2, i2, e2);
+          var s2 = this.local(), f2 = n(t2).local();
+          return c.call(s2, f2, i2, e2);
+        };
+      };
+    }));
+  }
+});
+
+// ../../node_modules/dayjs/plugin/timezone.js
+var require_timezone = __commonJS({
+  "../../node_modules/dayjs/plugin/timezone.js"(exports2, module2) {
+    !(function(t, e) {
+      "object" == typeof exports2 && "undefined" != typeof module2 ? module2.exports = e() : "function" == typeof define && define.amd ? define(e) : (t = "undefined" != typeof globalThis ? globalThis : t || self).dayjs_plugin_timezone = e();
+    })(exports2, (function() {
+      "use strict";
+      var t = { year: 0, month: 1, day: 2, hour: 3, minute: 4, second: 5 }, e = {};
+      return function(n, i, r) {
+        var o, a = function(t2, n2, i2) {
+          void 0 === i2 && (i2 = {});
+          var r2 = new Date(t2), o2 = (function(t3, n3) {
+            void 0 === n3 && (n3 = {});
+            var i3 = n3.timeZoneName || "short", r3 = t3 + "|" + i3, o3 = e[r3];
+            return o3 || (o3 = new Intl.DateTimeFormat("en-US", { hour12: false, timeZone: t3, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: i3 }), e[r3] = o3), o3;
+          })(n2, i2);
+          return o2.formatToParts(r2);
+        }, u = function(e2, n2) {
+          for (var i2 = a(e2, n2), o2 = [], u2 = 0; u2 < i2.length; u2 += 1) {
+            var f2 = i2[u2], s2 = f2.type, m = f2.value, c = t[s2];
+            c >= 0 && (o2[c] = parseInt(m, 10));
+          }
+          var l = o2[3], d = 24 === l ? 0 : l, h = o2[0] + "-" + o2[1] + "-" + o2[2] + " " + d + ":" + o2[4] + ":" + o2[5] + ":000", v = +e2;
+          return (r.utc(h).valueOf() - (v -= v % 1e3)) / 6e4;
+        }, f = i.prototype;
+        f.tz = function(t2, e2) {
+          if (void 0 === t2 && (t2 = o), !this.isValid()) return this;
+          var n2, i2 = this.utcOffset(), a2 = this.toDate(), f2 = a2.toLocaleString("en-US", { timeZone: t2 }), s2 = u(+a2, t2);
+          if (!Number(s2)) n2 = this.utcOffset(0, e2);
+          else if (n2 = r(f2, { locale: this.$L }).$set("millisecond", this.$ms).utcOffset(s2, true), e2) {
+            var m = n2.utcOffset();
+            n2 = n2.add(i2 - m, "minute");
+          }
+          return n2.$x.$timezone = t2, n2;
+        }, f.offsetName = function(t2) {
+          var e2 = this.$x.$timezone || r.tz.guess(), n2 = a(this.valueOf(), e2, { timeZoneName: t2 }).find((function(t3) {
+            return "timezonename" === t3.type.toLowerCase();
+          }));
+          return n2 && n2.value;
+        };
+        var s = f.startOf;
+        f.startOf = function(t2, e2) {
+          if (!this.$x || !this.$x.$timezone) return s.call(this, t2, e2);
+          var n2 = r(this.format("YYYY-MM-DD HH:mm:ss:SSS"), { locale: this.$L });
+          return s.call(n2, t2, e2).tz(this.$x.$timezone, true);
+        }, r.tz = function(t2, e2, n2) {
+          var i2 = n2 && e2, a2 = n2 || e2 || o, f2 = u(+r(), a2);
+          if ("string" != typeof t2) return r(t2).tz(a2);
+          var s2 = r.utc(t2, i2).valueOf();
+          if (Number.isNaN(s2)) {
+            var m = r(NaN);
+            return m.$x.$timezone = a2, m;
+          }
+          var c = (function(t3, e3, n3) {
+            var i3 = t3 - 60 * e3 * 1e3, r2 = u(i3, n3);
+            if (e3 === r2) return [i3, e3];
+            var o2 = u(i3 -= 60 * (r2 - e3) * 1e3, n3);
+            return r2 === o2 ? [i3, r2] : [t3 - 60 * Math.min(r2, o2) * 1e3, Math.max(r2, o2)];
+          })(s2, f2, a2), l = c[0], d = c[1], h = r(l).utcOffset(d);
+          return h.$x.$timezone = a2, h;
+        }, r.tz.guess = function() {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }, r.tz.setDefault = function(t2) {
+          o = t2;
+        };
+      };
+    }));
+  }
+});
+
 // cloudfunctions/api/src/index.ts
 var index_exports = {};
 __export(index_exports, {
   main: () => main
 });
 module.exports = __toCommonJS(index_exports);
-var import_wx_server_sdk = __toESM(require("wx-server-sdk"));
+var import_wx_server_sdk2 = __toESM(require("wx-server-sdk"));
 
 // ../../server/src/domain/constants.ts
 var COURSE_COLORS = [
@@ -2072,6 +2219,183 @@ function createFamilyWorkspace(initial) {
   };
 }
 
+// cloudfunctions/shared/remind.ts
+var import_wx_server_sdk = __toESM(require("wx-server-sdk"));
+var import_dayjs7 = __toESM(require_dayjs_min());
+var import_utc = __toESM(require_utc());
+var import_timezone = __toESM(require_timezone());
+
+// src/domain/remind.ts
+var REMIND_TEMPLATE_ID = "";
+var REMIND_TEMPLATE_FIELDS = {
+  title: "thing1",
+  time: "thing2",
+  location: "thing3",
+  note: "thing4"
+};
+var FIELD_LABELS = {
+  title: ["\u8BA1\u5212\u540D\u79F0", "\u8BFE\u7A0B\u540D\u79F0", "\u8BFE\u7A0B\u540D"],
+  time: ["\u5F00\u59CB\u65F6\u95F4", "\u4E0A\u8BFE\u65F6\u95F4"],
+  location: ["\u5730\u70B9", "\u4E0A\u8BFE\u5730\u70B9"],
+  note: ["\u5907\u6CE8", "\u6E29\u99A8\u63D0\u793A"]
+};
+function parseTemplateContent(content) {
+  const matches = [...content.matchAll(/([^:\n{：]+)[:：]\{\{(\w+)\.(?:DATA|data)\}\}/g)];
+  if (!matches.length) return null;
+  const fields = {};
+  for (const [, rawLabel, key] of matches) {
+    const label = rawLabel.trim();
+    for (const slot of Object.keys(FIELD_LABELS)) {
+      if (FIELD_LABELS[slot].some((item) => label.includes(item))) fields[slot] = key;
+    }
+  }
+  if (fields.title && fields.time && fields.location && fields.note) return fields;
+  if (matches.length >= 4) {
+    return {
+      title: matches[0][2],
+      time: matches[1][2],
+      location: matches[2][2],
+      note: matches[3][2]
+    };
+  }
+  return null;
+}
+
+// cloudfunctions/shared/remind.ts
+import_dayjs7.default.extend(import_utc.default);
+import_dayjs7.default.extend(import_timezone.default);
+import_wx_server_sdk.default.init({ env: import_wx_server_sdk.default.DYNAMIC_CURRENT_ENV });
+var db = () => import_wx_server_sdk.default.database();
+var reminders = () => db().collection("reminders");
+var templateCache = null;
+function errorText(error) {
+  const value = error;
+  return `${(value == null ? void 0 : value.errCode) ?? (value == null ? void 0 : value.errcode) ?? ""} ${(value == null ? void 0 : value.errMsg) ?? ""} ${(value == null ? void 0 : value.message) ?? ""}`;
+}
+function isCollectionMissing(error) {
+  return /-502005|DATABASE_COLLECTION_NOT_EXIST|collection not exist/i.test(errorText(error));
+}
+async function ensureReminders() {
+  try {
+    await db().createCollection("reminders");
+  } catch (error) {
+    if (/already exist|DATABASE_COLLECTION_ALREADY_EXIST|-501001|Table exist/i.test(errorText(error))) return;
+    throw error;
+  }
+}
+function shanghaiNow() {
+  return (0, import_dayjs7.default)().tz("Asia/Shanghai");
+}
+function minutesUntil(date, startTime) {
+  const start = import_dayjs7.default.tz(`${date} ${startTime}`, "YYYY-MM-DD HH:mm", "Asia/Shanghai");
+  return start.diff((0, import_dayjs7.default)(), "minute");
+}
+function reminderId(openid, courseId, date) {
+  return `${openid}_${courseId}_${date}`.replace(/[^\w-]/g, "").slice(0, 200);
+}
+async function loadSnapshot(familyId) {
+  try {
+    const got = await db().collection("families").doc(familyId).get();
+    const raw = got.data;
+    if (!(raw == null ? void 0 : raw.snapshotJson)) return null;
+    return JSON.parse(raw.snapshotJson);
+  } catch {
+    return null;
+  }
+}
+function findOccurrence(snapshot, courseId, date) {
+  return occurrencesOnDate(snapshot.courses, date, snapshot.scheduleExceptions).find((item) => item.course.id === courseId) ?? null;
+}
+function extractTemplates(result) {
+  var _a;
+  const body = result;
+  const list = Array.isArray(body) ? body : Array.isArray(body == null ? void 0 : body.data) ? body.data : Array.isArray((_a = body == null ? void 0 : body.result) == null ? void 0 : _a.data) ? body.result.data : [];
+  return list.filter((item) => item && typeof item === "object");
+}
+async function fetchTemplateList() {
+  const api = import_wx_server_sdk.default;
+  const attempts = [
+    () => api.openapi.wxaapi.newtmpl.gettemplate({}),
+    () => api.openapi.newtmpl.gettemplate({}),
+    () => api.openapi.subscribeMessage.getTemplate({}),
+    async () => {
+      var _a, _b, _c;
+      return (_c = await ((_b = (_a = api.open) == null ? void 0 : _a.callOpenAPI) == null ? void 0 : _b.call(_a, { api: "wxaapi.newtmpl.gettemplate" }))) == null ? void 0 : _c.result;
+    }
+  ];
+  let last;
+  for (const run of attempts) {
+    try {
+      const list = extractTemplates(await run());
+      if (list.length) return list;
+    } catch (error) {
+      last = error;
+    }
+  }
+  if (last) throw last;
+  return [];
+}
+async function resolveRemindTemplate() {
+  if (REMIND_TEMPLATE_ID) {
+    return { id: REMIND_TEMPLATE_ID, fields: { ...REMIND_TEMPLATE_FIELDS } };
+  }
+  if (templateCache) return templateCache;
+  const list = await fetchTemplateList();
+  for (const item of list) {
+    const fields = item.content ? parseTemplateContent(item.content) : null;
+    if (item.priTmplId && fields) {
+      templateCache = { id: item.priTmplId, fields };
+      return templateCache;
+    }
+  }
+  const only = list.length === 1 ? list[0] : void 0;
+  const fallback = (only == null ? void 0 : only.content) ? parseTemplateContent(only.content) : null;
+  if ((only == null ? void 0 : only.priTmplId) && fallback) {
+    templateCache = { id: only.priTmplId, fields: fallback };
+    return templateCache;
+  }
+  throw new FamilyActionError("TEMPLATE_MISSING", "\u8FD8\u6CA1\u6709\u53EF\u7528\u7684\u8BFE\u524D\u63D0\u9192\u6A21\u677F");
+}
+async function listReminders(openid) {
+  await ensureReminders();
+  const today = shanghaiNow().format("YYYY-MM-DD");
+  try {
+    const found = await reminders().where({ openid }).limit(100).get();
+    const rows = found.data || [];
+    return rows.filter((item) => (item.status === "pending" || item.status === "sent") && item.date >= today).map((item) => ({ courseId: item.courseId, date: item.date, status: item.status }));
+  } catch (error) {
+    if (isCollectionMissing(error)) return [];
+    throw error;
+  }
+}
+async function subscribeReminder(user, payload) {
+  const courseId = String(payload.courseId || "");
+  const date = String(payload.date || "");
+  const envVersion = String(payload.envVersion || "");
+  if (!courseId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new FamilyActionError("INVALID_ACTION", "\u8BF7\u9009\u62E9\u4E00\u8282\u8BFE");
+  }
+  await ensureReminders();
+  const snapshot = await loadSnapshot(user.familyId);
+  const occurrence = snapshot ? findOccurrence(snapshot, courseId, date) : null;
+  if (!occurrence) throw new FamilyActionError("OCCURRENCE_GONE", "\u8FD9\u8282\u8BFE\u5DF2\u53D6\u6D88\u6216\u4E0D\u5B58\u5728");
+  const startTime = occurrence.course.recurrence.startTime;
+  const minutes = minutesUntil(date, startTime);
+  if (minutes < 1) throw new FamilyActionError("ALREADY_STARTED", "\u8FD9\u8282\u8BFE\u5DF2\u7ECF\u5F00\u59CB\u4E86");
+  await reminders().doc(reminderId(user.openid, courseId, date)).set({
+    data: {
+      openid: user.openid,
+      familyId: user.familyId,
+      courseId,
+      date,
+      envVersion: envVersion === "develop" || envVersion === "trial" ? envVersion : "release",
+      status: "pending",
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    }
+  });
+  return { late: minutes < 15 };
+}
+
 // src/domain/family-account.ts
 var FAMILY_ROLE_LABEL = {
   owner: "\u521B\u5EFA\u8005",
@@ -2152,25 +2476,25 @@ function maskSnapshotForRole(snapshot, role) {
 }
 
 // cloudfunctions/api/src/index.ts
-import_wx_server_sdk.default.init({ env: import_wx_server_sdk.default.DYNAMIC_CURRENT_ENV });
-var db = import_wx_server_sdk.default.database();
-var users = () => db.collection("users");
-var families = () => db.collection("families");
-var invites = () => db.collection("invites");
+import_wx_server_sdk2.default.init({ env: import_wx_server_sdk2.default.DYNAMIC_CURRENT_ENV });
+var db2 = import_wx_server_sdk2.default.database();
+var users = () => db2.collection("users");
+var families = () => db2.collection("families");
+var invites = () => db2.collection("invites");
 var COLLECTIONS = ["users", "families", "invites"];
-function errorText(error) {
+function errorText2(error) {
   const value = error;
   return `${(value == null ? void 0 : value.errCode) ?? ""} ${(value == null ? void 0 : value.errMsg) ?? ""} ${(value == null ? void 0 : value.message) ?? ""}`;
 }
-function isCollectionMissing(error) {
-  return /-502005|DATABASE_COLLECTION_NOT_EXIST|collection not exist/i.test(errorText(error));
+function isCollectionMissing2(error) {
+  return /-502005|DATABASE_COLLECTION_NOT_EXIST|collection not exist/i.test(errorText2(error));
 }
 async function ensureCollections() {
   for (const name of COLLECTIONS) {
     try {
-      await db.createCollection(name);
+      await db2.createCollection(name);
     } catch (error) {
-      if (!/-501001|already exist|DATABASE_COLLECTION_ALREADY_EXIST/i.test(errorText(error))) throw error;
+      if (!/-501001|already exist|DATABASE_COLLECTION_ALREADY_EXIST/i.test(errorText2(error))) throw error;
     }
   }
 }
@@ -2300,7 +2624,7 @@ function versionOf(family) {
   return family.version || 1;
 }
 async function withFamily(familyId, apply) {
-  return db.runTransaction(async (transaction) => {
+  return db2.runTransaction(async (transaction) => {
     const ref = transaction.collection("families").doc(familyId);
     const got = await ref.get();
     const raw = got.data;
@@ -2433,7 +2757,7 @@ async function createInvite(user, payload) {
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     try {
-      await db.runTransaction(async (transaction) => {
+      await db2.runTransaction(async (transaction) => {
         var _a;
         const ref = transaction.collection("invites").doc(code);
         let taken = false;
@@ -2478,14 +2802,14 @@ async function readableAvatarUrls(members) {
   const fileList = [...new Set(members.map((item) => item.avatarUrl).filter((url) => url.startsWith("cloud://")))];
   if (!fileList.length) return members;
   try {
-    const got = await import_wx_server_sdk.default.getTempFileURL({ fileList });
+    const got = await import_wx_server_sdk2.default.getTempFileURL({ fileList });
     const urls = /* @__PURE__ */ new Map();
     for (const file of got.fileList || []) {
       if (file.fileID && file.tempFileURL) urls.set(file.fileID, file.tempFileURL);
     }
     return members.map((item) => ({ ...item, avatarUrl: urls.get(item.avatarUrl) || item.avatarUrl }));
   } catch (error) {
-    console.error("getTempFileURL", errorText(error));
+    console.error("getTempFileURL", errorText2(error));
     return members;
   }
 }
@@ -2569,7 +2893,7 @@ async function joinFamily(openid, unionid, payload) {
   const avatarUrl = normalizeAvatarUrl(payload.avatarUrl);
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const previousFamilyId = (existing == null ? void 0 : existing.role) === "owner" ? existing.familyId : "";
-  await db.runTransaction(async (transaction) => {
+  await db2.runTransaction(async (transaction) => {
     const inviteRef = transaction.collection("invites").doc(invite.code);
     let current;
     try {
@@ -2659,7 +2983,10 @@ async function handle(openid, unionid, action, payload) {
   if (action === "login") return login(openid, unionid, payload);
   if (action === "previewInvite") return previewInvite(openid, payload);
   if (action === "joinFamily") return joinFamily(openid, unionid, payload);
+  if (action === "remindTemplate") return resolveRemindTemplate();
   const user = await requireUser(openid);
+  if (action === "listReminders") return listReminders(openid);
+  if (action === "subscribeReminder") return subscribeReminder(user, payload);
   if (action === "leaveFamily") return leaveFamily(user);
   if (action === "sync") return syncFamily(user, payload);
   if (action === "createInvite" || action === "listMembers" || action === "removeMember" || action === "setAvatar") {
@@ -2668,7 +2995,7 @@ async function handle(openid, unionid, action, payload) {
   return dispatchWorkspace(user, action, payload);
 }
 async function main(event) {
-  const context = import_wx_server_sdk.default.getWXContext();
+  const context = import_wx_server_sdk2.default.getWXContext();
   const openid = context.OPENID || "";
   if (!openid) return fail("UNAUTHENTICATED", "\u8BF7\u5728\u5FAE\u4FE1\u5185\u6253\u5F00\u5C0F\u7A0B\u5E8F");
   try {
@@ -2678,7 +3005,7 @@ async function main(event) {
     try {
       return { ok: true, data: await handle(openid, unionid, action, payload) };
     } catch (error) {
-      if (!isCollectionMissing(error)) throw error;
+      if (!isCollectionMissing2(error)) throw error;
       await ensureCollections();
       return { ok: true, data: await handle(openid, unionid, action, payload) };
     }

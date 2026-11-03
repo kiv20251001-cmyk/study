@@ -3,6 +3,7 @@ import type { AppSnapshot, ChildAvatarKey } from '../../../../../server/src/doma
 import { createEmptyFamilySnapshot } from '../../../../../server/src/workspace/empty-snapshot'
 import { applyFamilyAction, FamilyActionError } from '../../../../../server/src/workspace/family-actions'
 import { createFamilyWorkspace, hourlyBillsNeedRefresh } from '../../../../../server/src/workspace/family-workspace'
+import { listReminders, resolveRemindTemplate, subscribeReminder } from '../../shared/remind'
 import {
   canInviteRole,
   canLeaveFamily,
@@ -617,7 +618,10 @@ async function handle(openid: string, unionid: string, action: string, payload: 
   if (action === 'login') return login(openid, unionid, payload)
   if (action === 'previewInvite') return previewInvite(openid, payload)
   if (action === 'joinFamily') return joinFamily(openid, unionid, payload)
+  if (action === 'remindTemplate') return resolveRemindTemplate()
   const user = await requireUser(openid)
+  if (action === 'listReminders') return listReminders(openid)
+  if (action === 'subscribeReminder') return subscribeReminder(user, payload)
   if (action === 'leaveFamily') return leaveFamily(user)
   if (action === 'sync') return syncFamily(user, payload)
   if (action === 'createInvite' || action === 'listMembers' || action === 'removeMember' || action === 'setAvatar') {

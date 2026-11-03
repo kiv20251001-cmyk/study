@@ -18,12 +18,14 @@ export function useFamilyPage() {
     if (isMomentsPreview()) return
     if (store.ready) {
       ui.touchToday()
+      void store.loadReminders()
       syncFamily()
       return
     }
     ensureSession().then(() => {
       if (!store.ready) return
       ui.touchToday()
+      void store.loadReminders()
       // 先把只读快照画出来；账单校准放到首屏稳定后，避免云端事务拖长冷启动恢复。
       setTimeout(() => syncFamily(true), 600)
     })

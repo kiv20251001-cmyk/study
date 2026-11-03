@@ -15,6 +15,7 @@ import type {
 } from '@server-domain/types'
 import { emptySnapshot } from '@server-domain/constants'
 import { callCloud, CloudError, NEED_FAMILY, NOT_MEMBER } from '@/cloud/call'
+import type { WxEnvVersion } from '@/config'
 import { promptLogin } from '@/utils/login-prompt'
 import {
   canInviteRole,
@@ -84,6 +85,7 @@ function clearCache() {
  */
 let guestConfirmed = false
 let resumeTask: Promise<void> | null = null
+let remindLoad: Promise<unknown> | null = null
 
 let inflight: Promise<unknown> | null = null
 
@@ -179,6 +181,8 @@ export const useFamilyStore = defineStore('family', {
       snapshot: frozen(snapshot),
       syncedAt: 0,
       rangeMonth: '',
+      /** 已经点过闹钟、还没过期的课。键是「课程 ID_日期」。 */
+      remindKeys: [] as string[],
     }
   },
   getters: {
@@ -400,6 +404,7 @@ export const useFamilyStore = defineStore('family', {
       this.snapshot = frozen(emptySnapshot())
       this.syncedAt = 0
       this.rangeMonth = ''
+      this.remindKeys = []
       uni.removeStorageSync(LOGGED_KEY)
       clearCache()
     },
@@ -489,6 +494,33 @@ export const useFamilyStore = defineStore('family', {
     },
     removeExpense(id: string) {
       return this.dispatch('removeExpense', { id })
+    },
+    /** 今天及以后、已经订阅成功的课。失败时保持原样，下次再问。 */
+    async loadReminders() {
+      if (!this.ready) return
+      if (remindLoad) return remindLoad
+      const current = this
+      remindLoad = callCloud<Array<{ courseId: string; date: string }>>('listReminders')
+        .then((rows) => {
+          current.remindKeys = rows.map((item) => `${item.courseId}_${item.date}`)
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          remindLoad = null
+        })
+      return remindLoad
+    },
+    /** 用户已经在微信弹窗里点了允许。这里只记下这一节课，好让定时任务到点发送。 */
+    async subscribeReminder(courseId: string, date: string, envVersion: WxEnvVersion) {
+      if (!this.ready) await ensureSession()
+      if (needsFamily()) {
+        promptLogin()
+        throw new CloudError('请先创建家庭', NEED_FAMILY)
+      }
+      const result = await callCloud<{ late: boolean }>('subscribeReminder', { courseId, date, envVersion })
+      const key = `${courseId}_${date}`
+      if (!this.remindKeys.includes(key)) this.remindKeys = [...this.remindKeys, key]
+      return result
     },
   },
 })

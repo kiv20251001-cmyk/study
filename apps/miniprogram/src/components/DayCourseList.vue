@@ -8,7 +8,10 @@ import { buildCourseBillLedger } from '@server-domain/courseBills'
 import { courseScheduleProgress } from '@server-domain/courseSchedule'
 import { money } from '@server-domain/billing'
 import type { DayOccurrence } from '@server-domain/types'
+import { showCloudError } from '@/cloud/call'
+import { WX_ENV_VERSION } from '@/config'
 import { useFamilyStore } from '@/stores/family'
+import { loadRemindTemplate } from '@/utils/remind'
 import { occurrenceExpense, temporaryRemark } from '@/utils/view'
 import { EMPTY_DAY_LINES, EMPTY_DAY_LINES_VIEWER, SCHEDULE_LOADING, SCHEDULE_OFFLINE, pickDailyLine } from '@/domain/copy'
 import { storeToRefs } from 'pinia'
@@ -37,12 +40,21 @@ const emit = defineEmits<{
 }>()
 
 const store = useFamilyStore()
+let templateId = ''
+void loadRemindTemplate().then((item) => {
+  templateId = item.id
+}).catch(() => {
+  templateId = ''
+})
 const { isDark } = storeToRefs(useThemeStore())
 const now = ref(dayjs().format('HH:mm'))
 function tick() {
   now.value = dayjs().format('HH:mm')
 }
-onShow(tick)
+onShow(() => {
+  tick()
+  if (store.ready) void store.loadReminders()
+})
 const clock = setInterval(tick, 30000)
 onUnmounted(() => clearInterval(clock))
 /** 每次打开小程序换一批，同一天内切页不跳。 */
@@ -101,6 +113,57 @@ function isFinished(date: string, end: string) {
   if (date < today) return true
   if (date > today) return false
   return end <= now.value
+}
+
+function canRemind(item: DayOccurrence) {
+  const today = dayjs().format('YYYY-MM-DD')
+  if (item.date > today) return true
+  if (item.date < today) return false
+  const start = item.exception?.startTime ?? item.course.recurrence.startTime
+  return start > now.value
+}
+
+function subscribe(item: DayOccurrence) {
+  if (!canRemind(item)) {
+    uni.showToast({ icon: 'none', title: '这节课已经开始了' })
+    return
+  }
+  if (!store.ready && !store.fromCache) {
+    uni.showToast({ icon: 'none', title: store.booting ? '正在读取课表…' : '请先创建或加入家庭' })
+    return
+  }
+  if (store.remindKeys.includes(item.id)) {
+    uni.showToast({ icon: 'none', title: '这节课会在课前提醒你' })
+    return
+  }
+  if (!templateId) {
+    uni.showToast({ icon: 'none', title: '提醒模板还没准备好' })
+    void loadRemindTemplate().then((found) => {
+      templateId = found.id
+    }).catch(() => {})
+    return
+  }
+  uni.requestSubscribeMessage({
+    tmplIds: [templateId],
+    success: (result) => {
+      const decision = (result as Record<string, string>)[templateId]
+      if (decision !== 'accept') {
+        uni.showToast({ icon: 'none', title: '还没开启提醒' })
+        return
+      }
+      void store.subscribeReminder(item.course.id, item.date, WX_ENV_VERSION).then((saved) => {
+        uni.showToast({
+          icon: 'none',
+          title: saved.late ? '已开启。离上课不足 15 分钟，可能来不及提醒' : '已开启，课前 15 分钟提醒你',
+        })
+      }).catch((error: unknown) => {
+        showCloudError(error)
+      })
+    },
+    fail: () => {
+      uni.showToast({ icon: 'none', title: '还没开启提醒' })
+    },
+  })
 }
 
 function courseIcon(item: DayOccurrence) {
@@ -187,6 +250,17 @@ const rows = computed(() => {
     <view v-if="rows.length" class="lesson-list">
       <view v-for="(row, index) in rows" :key="row.item.id" class="timeline-entry">
         <view class="timeline-marker">
+          <button
+            v-if="canRemind(row.item)"
+            hover-class="press-on"
+            hover-stay-time="80"
+            class="alarm press"
+            :class="{ on: store.remindKeys.includes(row.item.id) }"
+            @click="subscribe(row.item)"
+          >
+            <AppIcon name="alarm" :tone="store.remindKeys.includes(row.item.id) ? 'accent' : 'muted'" :size="14" />
+          </button>
+          <view v-else class="alarm-spacer" />
           <view class="timeline-times">
             <text class="timeline-start" :style="row.startStyle">{{ row.start }}</text>
             <text class="timeline-end" :style="row.endStyle">{{ row.end }}</text>
@@ -330,11 +404,28 @@ const rows = computed(() => {
 .timeline-entry { display: flex; align-items: stretch; gap: 8px; margin-bottom: 12px; }
 .timeline-marker {
   display: flex;
-  width: 52px;
+  width: 76px;
   flex: 0 0 auto;
   align-items: stretch;
+  gap: 2px;
   padding-top: 2px;
 }
+.alarm, .alarm-spacer {
+  width: 22px;
+  flex: 0 0 22px;
+  align-self: center;
+}
+.alarm {
+  height: 22px;
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: var(--elev-md);
+}
+.alarm.on { background: var(--accent-soft); }
 .timeline-times {
   display: flex;
   width: 36px;
