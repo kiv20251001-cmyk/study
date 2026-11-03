@@ -9,6 +9,7 @@ import { useThemeStore } from '@/utils/wx-theme'
 import { currentMixBase, deepTone, mix, tileBackground } from '@/utils/color'
 import { windowWidth } from '@/utils/system'
 import AppIcon from '@/components/AppIcon.vue'
+import { SCHEDULE_LOADING, SCHEDULE_OFFLINE } from '@/domain/copy'
 import EmptyHint from '@/components/EmptyHint.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TrendChart from '@/components/TrendChart.vue'
@@ -136,6 +137,8 @@ function formatTrendHours(hours: number) {
             </view>
           </view>
         </view>
+        <EmptyHint v-else-if="store.booting" icon="bill" :label="SCHEDULE_LOADING" />
+        <EmptyHint v-else-if="store.offline" icon="bill" :label="SCHEDULE_OFFLINE" />
         <EmptyHint v-else icon="bill" label="还没有账单" />
       </view>
 
@@ -199,7 +202,7 @@ function formatTrendHours(hours: number) {
         </view>
       </scroll-view>
       <view v-else class="card">
-        <EmptyHint icon="calendar" label="还没有课程" />
+        <EmptyHint icon="calendar" :label="store.booting ? SCHEDULE_LOADING : store.offline ? SCHEDULE_OFFLINE : '还没有课程'" />
       </view>
 
       <TrendChart

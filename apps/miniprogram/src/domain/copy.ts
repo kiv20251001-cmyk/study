@@ -1,3 +1,8 @@
+/** 冷启动还没拿到课表时的占位，避免先画成「今天没有课」。 */
+export const SCHEDULE_LOADING = '正在同步课表…'
+/** 云端这次没回来、本机也没有上次课表。 */
+export const SCHEDULE_OFFLINE = '课表还没同步过来，过一会儿再看。'
+
 /** 某天没有课程计划时，空状态下方随机展示的一句话。 */
 export const EMPTY_DAY_LINES = [
   '计划有变化也没关系，好好享受空闲时间。',

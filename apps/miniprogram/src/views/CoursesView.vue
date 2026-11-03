@@ -12,6 +12,7 @@ import { useFamilyStore } from '@/stores/family'
 import { useThemeStore } from '@/utils/wx-theme'
 import { useUiStore } from '@/stores/ui'
 import AppIcon from '@/components/AppIcon.vue'
+import { SCHEDULE_LOADING, SCHEDULE_OFFLINE } from '@/domain/copy'
 import EmptyHint from '@/components/EmptyHint.vue'
 import ChildAvatar from '@/components/ChildAvatar.vue'
 import { cardBackground, currentMixBase, deepTone, folderTab, mix, tileBackground } from '@/utils/color'
@@ -257,7 +258,10 @@ function more(course: Course) {
         </template>
       </PageHeader>
 
-      <view v-if="!cards.length && !store.canWrite" class="card">
+      <view v-if="store.booting || (store.offline && !cards.length)" class="card">
+        <EmptyHint icon="calendar" :label="store.booting ? SCHEDULE_LOADING : SCHEDULE_OFFLINE" />
+      </view>
+      <view v-else-if="!cards.length && !store.canWrite" class="card">
         <EmptyHint icon="calendar" label="还没有课程" />
       </view>
       <view v-else class="course-grid">

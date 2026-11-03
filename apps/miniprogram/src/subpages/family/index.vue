@@ -186,8 +186,8 @@ function leave() {
       <view class="card role-card">
         <view class="role-copy">
           <text class="eyebrow">当前身份</text>
-          <text class="role-name">{{ store.ready ? store.roleLabel : '还没有家庭' }}</text>
-          <text class="muted">{{ store.ready ? FAMILY_ROLE_HINT[store.role] : '创建或加入家庭后，可以和家人一起看课表。' }}</text>
+          <text class="role-name">{{ store.ready || store.fromCache ? store.roleLabel : (store.booting ? '正在同步…' : '还没有家庭') }}</text>
+          <text class="muted">{{ store.ready || store.fromCache ? FAMILY_ROLE_HINT[store.role] : '创建或加入家庭后，可以和家人一起看课表。' }}</text>
         </view>
       </view>
 

@@ -10,7 +10,7 @@ import { money } from '@server-domain/billing'
 import type { DayOccurrence } from '@server-domain/types'
 import { useFamilyStore } from '@/stores/family'
 import { occurrenceExpense, temporaryRemark } from '@/utils/view'
-import { EMPTY_DAY_LINES, EMPTY_DAY_LINES_VIEWER, pickDailyLine } from '@/domain/copy'
+import { EMPTY_DAY_LINES, EMPTY_DAY_LINES_VIEWER, SCHEDULE_LOADING, SCHEDULE_OFFLINE, pickDailyLine } from '@/domain/copy'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/utils/wx-theme'
 import { cardBackground, currentMixBase, deepTone, mix, tileBackground } from '@/utils/color'
@@ -174,8 +174,11 @@ const rows = computed(() => {
 <template>
   <view class="schedule">
     <view class="schedule-head">
-      <text class="schedule-title">{{ title }}</text>
-      <button hover-class="press-on" hover-stay-time="80" v-if="!readonly" class="add" @click="emit('add')">
+      <view class="schedule-title-wrap">
+        <text class="schedule-title">{{ title }}</text>
+        <text v-if="store.syncing" class="syncing">{{ store.stale ? '上次课表' : '同步中' }}</text>
+      </view>
+      <button hover-class="press-on" hover-stay-time="80" v-if="!readonly && !store.booting" class="add" @click="emit('add')">
         <AppIcon name="plus" tone="accent" :size="14" />
         <text>{{ actionLabel }}</text>
       </button>
@@ -255,6 +258,25 @@ const rows = computed(() => {
       </view>
     </view>
 
+    <view v-else-if="store.booting" class="boot-list">
+      <view v-for="n in 2" :key="n" class="boot-row">
+        <view class="sk boot-time" />
+        <view class="boot-card">
+          <view class="sk boot-icon" />
+          <view class="boot-copy">
+            <view class="sk sk-line boot-line-short" />
+            <view class="sk sk-title boot-line-title" />
+            <view class="sk sk-line boot-line-long" />
+          </view>
+        </view>
+      </view>
+      <text class="boot-hint">{{ SCHEDULE_LOADING }}</text>
+    </view>
+
+    <view v-else-if="store.offline" class="empty-card">
+      <EmptyHint icon="calendar" :label="SCHEDULE_OFFLINE" />
+    </view>
+
     <view v-else class="empty-card">
       <EmptyHint icon="calendar" :label="emptyLine">
         <template v-if="!readonly" #mark>
@@ -270,7 +292,29 @@ const rows = computed(() => {
 <style scoped>
 .schedule { margin-bottom: 28px; }
 .schedule-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
+.schedule-title-wrap { display: flex; align-items: baseline; min-width: 0; gap: 8px; }
 .schedule-title { font-size: 19px; font-weight: 800; letter-spacing: -0.025em; }
+.syncing { color: var(--muted); font-size: 12px; font-weight: 650; }
+.boot-list { display: flex; flex-direction: column; gap: 12px; }
+.boot-row { display: flex; align-items: stretch; gap: 8px; }
+.boot-time { width: 36px; height: 72px; flex: 0 0 auto; border-radius: 12px; }
+.boot-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 108px;
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: var(--elev-md);
+}
+.boot-icon { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 18px; }
+.boot-copy { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.boot-line-short { width: 72px; }
+.boot-line-title { width: 46%; }
+.boot-line-long { width: 64%; }
+.boot-hint { color: var(--muted); font-size: 12px; text-align: center; }
 .add {
   display: flex;
   min-height: 32px;

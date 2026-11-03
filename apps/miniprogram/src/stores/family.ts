@@ -31,6 +31,52 @@ import {
 } from '@/domain/family-account'
 
 const LOGGED_KEY = 'myhome.mp.logged'
+/** 上次成功拉到的家庭快照。只给冷启动先画出来，授权仍以云端恢复结果为准。单 key 上限 1MB。 */
+const CACHE_KEY = 'myhome.mp.cache'
+
+interface SessionCache {
+  openid: string
+  familyId: string
+  role: FamilyRole
+  displayName: string
+  nickName: string
+  avatarUrl: string
+  preferredChildId: string
+  version: number
+  snapshot: AppSnapshot
+}
+
+function isRole(value: unknown): value is FamilyRole {
+  return value === 'owner' || value === 'parent' || value === 'viewer'
+}
+
+function readCache(): SessionCache | null {
+  try {
+    const raw = uni.getStorageSync(CACHE_KEY) as SessionCache | ''
+    if (!raw || typeof raw !== 'object' || !raw.familyId || !isRole(raw.role)) return null
+    const snap = raw.snapshot
+    if (!snap || !Array.isArray(snap.children) || !Array.isArray(snap.courses) || !Array.isArray(snap.expenses)) return null
+    return raw
+  } catch {
+    return null
+  }
+}
+
+function writeCache(input: SessionCache) {
+  try {
+    uni.setStorageSync(CACHE_KEY, input)
+  } catch {
+    // 超出单 key 1MB 或存储失败时放弃，下次冷启动仍等云端。
+  }
+}
+
+function clearCache() {
+  try {
+    uni.removeStorageSync(CACHE_KEY)
+  } catch {
+    // 已经没有这份缓存。
+  }
+}
 
 /**
  * 这次冷启动已经问过云端，确认这个微信号没有家庭。
@@ -106,22 +152,35 @@ export interface FamilyRoster {
 }
 
 export const useFamilyStore = defineStore('family', {
-  state: () => ({
-    ready: false,
-    openid: '',
-    familyId: '',
-    role: 'owner' as FamilyRole,
-    displayName: '',
-    nickName: '',
-    avatarUrl: '',
-    /** 云端家庭文档的版本号，任何人改了课表都会 +1，用来判断本机数据是不是最新的。 */
-    version: 0,
-    /** 家人只在本机切换正在看的孩子，不写进全家共用的快照。 */
-    preferredChildId: '',
-    snapshot: frozen(emptySnapshot() as AppSnapshot),
-    syncedAt: 0,
-    rangeMonth: '',
-  }),
+  state: () => {
+    const cache = readCache()
+    const snapshot = cache ? withCurrentCourseColors(cache.snapshot) : emptySnapshot() as AppSnapshot
+    return {
+      /** 这次进程里云端已经确认过家庭会话。 */
+      ready: false,
+      /** 当前画面用的是上次存下的快照，云端还没确认。 */
+      fromCache: Boolean(cache),
+      /** 这次冷启动的第一次恢复已经结束（成功、没有家庭或失败）。 */
+      bootDone: false,
+      /** 恢复失败，画面仍是上次课表。 */
+      stale: false,
+      /** 恢复失败，而且没有可先展示的课表。 */
+      offline: false,
+      openid: cache?.openid || '',
+      familyId: cache?.familyId || '',
+      role: (cache?.role || 'owner') as FamilyRole,
+      displayName: cache?.displayName || '',
+      nickName: cache?.nickName || '',
+      avatarUrl: cache?.avatarUrl || '',
+      /** 云端家庭文档的版本号，任何人改了课表都会 +1，用来判断本机数据是不是最新的。 */
+      version: cache?.version || 0,
+      /** 家人只在本机切换正在看的孩子，不写进全家共用的快照。 */
+      preferredChildId: cache?.preferredChildId || '',
+      snapshot: frozen(snapshot),
+      syncedAt: 0,
+      rangeMonth: '',
+    }
+  },
   getters: {
     roleLabel(state): string {
       return FAMILY_ROLE_LABEL[state.role]
@@ -186,6 +245,14 @@ export const useFamilyStore = defineStore('family', {
     overviewPayments(state): Payment[] {
       return state.snapshot.payments ?? []
     },
+    /** 还没有上次课表，云端也还没回来：今日计划画骨架，不要画成当天没课。 */
+    booting(): boolean {
+      return !this.ready && !this.fromCache && !this.bootDone
+    },
+    /** 已经先画出上次课表，云端恢复还在进行或上次失败。朋友圈单页不再转圈。 */
+    syncing(): boolean {
+      return !this.ready && this.fromCache && (!this.bootDone || this.stale)
+    },
   },
   actions: {
     /** 云端版本没变就不替换快照；避免为整份家庭数据 stringify 后再比较。 */
@@ -196,7 +263,24 @@ export const useFamilyStore = defineStore('family', {
       }
       snapshot = withCurrentCourseColors(snapshot)
       this.snapshot = frozen(snapshot)
+      if (version) this.version = version
       this.syncedAt = Date.now()
+      if (this.ready && this.familyId) this.persist()
+    },
+    /** 把当前会话写进本机，供下次冷启动先画出来。失败不影响云端数据。 */
+    persist() {
+      if (!this.familyId) return
+      writeCache({
+        openid: this.openid,
+        familyId: this.familyId,
+        role: this.role,
+        displayName: this.displayName,
+        nickName: this.nickName,
+        avatarUrl: this.avatarUrl,
+        preferredChildId: this.preferredChildId,
+        version: this.version,
+        snapshot: this.snapshot,
+      })
     },
     applySession(data: CloudSession) {
       guestConfirmed = false
@@ -211,7 +295,11 @@ export const useFamilyStore = defineStore('family', {
       this.applySnapshot(data.snapshot)
       if (data.version) this.version = data.version
       this.rangeMonth = ''
+      this.fromCache = false
+      this.stale = false
+      this.offline = false
       this.ready = true
+      this.persist()
       uni.setStorageSync(LOGGED_KEY, '1')
     },
     async dispatch<T>(action: string, payload?: Record<string, unknown>) {
@@ -297,6 +385,10 @@ export const useFamilyStore = defineStore('family', {
     },
     logout() {
       this.ready = false
+      this.fromCache = false
+      this.stale = false
+      this.offline = false
+      this.bootDone = true
       this.openid = ''
       this.familyId = ''
       this.role = 'owner'
@@ -309,6 +401,7 @@ export const useFamilyStore = defineStore('family', {
       this.syncedAt = 0
       this.rangeMonth = ''
       uni.removeStorageSync(LOGGED_KEY)
+      clearCache()
     },
     refresh() {
       if (inflight) return inflight
@@ -340,6 +433,7 @@ export const useFamilyStore = defineStore('family', {
       }
       if (!this.canWrite) {
         this.preferredChildId = childId
+        this.persist()
         return Promise.resolve(childId)
       }
       this.preferredChildId = ''
@@ -405,20 +499,31 @@ export function hasLocalSession() {
 
 /**
  * 用 openid 向云端恢复家庭。有本机标记时照旧恢复；标记被清掉时也会问一次，避免用户重新选孩子。
- * 没有家庭时记在本次进程里，不再反复请求，也不会新建家庭。网络失败不记成游客，下次打开再试。
+ * 没有家庭时记在本次进程里，不再反复请求，也不会新建家庭。
+ * 网络失败不记成游客，也不清掉上次课表；下次打开再试。确认没有家庭、被移出时才清缓存。
  */
 export function ensureSession() {
   const store = useFamilyStore()
-  if (store.ready || guestConfirmed) return Promise.resolve()
+  if (store.ready || guestConfirmed) {
+    store.bootDone = true
+    return Promise.resolve()
+  }
   if (!resumeTask) {
-    const hadLocal = hasLocalSession()
+    const hadLocal = hasLocalSession() || store.fromCache
     resumeTask = store.resume()
       .then(() => undefined)
       .catch((error: unknown) => {
-        if (error instanceof CloudError && error.code === 'UNAUTHENTICATED') guestConfirmed = true
-        if (hadLocal) store.logout()
+        const code = error instanceof CloudError ? error.code : 'CALL_FAILED'
+        if (code === 'UNAUTHENTICATED') guestConfirmed = true
+        if (code === 'UNAUTHENTICATED' || code === 'NOT_MEMBER' || code === 'FAMILY_MISMATCH') {
+          if (hadLocal) store.logout()
+          return
+        }
+        store.stale = store.fromCache
+        store.offline = !store.fromCache
       })
       .finally(() => {
+        store.bootDone = true
         resumeTask = null
       })
   }

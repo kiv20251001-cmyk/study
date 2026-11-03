@@ -179,7 +179,14 @@ async function undoCancel() {
             <text>课程日历</text>
             <text class="more">›</text>
           </view>
-          <view class="overview-body">
+          <view v-if="store.booting" class="overview-body">
+            <view>
+              <view class="sk sk-title boot-num" />
+              <view class="sk sk-line boot-sub" />
+            </view>
+            <view class="sk boot-ring" />
+          </view>
+          <view v-else class="overview-body">
             <view>
               <text class="big">{{ items.length }}</text>
               <text class="muted">节课程</text>
@@ -195,7 +202,14 @@ async function undoCancel() {
             <text>本周课程账单</text>
             <text class="more">›</text>
           </view>
-          <view class="overview-body">
+          <view v-if="store.booting" class="overview-body">
+            <view>
+              <view class="sk sk-title boot-num" />
+              <view class="sk sk-line boot-sub" />
+            </view>
+            <view class="sk boot-ring" />
+          </view>
+          <view v-else class="overview-body">
             <view>
               <text class="big">{{ money(weekOpen) }}</text>
               <text class="muted">{{ weekBills.length }} 笔账单{{ weekUnbilled ? ' · 待结算 ' + money(weekUnbilled) : '' }}</text>
@@ -302,6 +316,9 @@ async function undoCancel() {
 .mark.bill { background: linear-gradient(140deg, #ff8ea3, #d93d59); box-shadow: 0 6px 14px -6px rgba(255, 95, 121, 0.75), inset 0 1px 0 rgba(255,255,255,.45); }
 .more { font-size: 15px; }
 .overview-body { display: flex; align-items: flex-end; justify-content: space-between; }
+.boot-num { width: 48px; margin-bottom: 8px; }
+.boot-sub { width: 64px; }
+.boot-ring { width: 44px; height: 44px; border-radius: 50%; }
 .big { display: block; color: var(--ink); font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
 .overview-ring {
   width: 44px;
