@@ -547,6 +547,7 @@ function raiseObject(result) {
   const reason = "reason" in result ? String(result.reason) : "";
   if (reason === "conflict") throw new FamilyActionError("SCHEDULE_CONFLICT", "\u8BE5\u5B69\u5B50\u6B64\u65F6\u5DF2\u6709\u5176\u4ED6\u8BFE\u7A0B");
   if (reason === "duplicate") throw new FamilyActionError("OCCURRENCE_DUPLICATE", "\u6240\u9009\u65E5\u671F\u90FD\u5DF2\u6709\u8FD9\u95E8\u8BFE");
+  if (reason === "temporary") throw new FamilyActionError("INVALID_INPUT", "\u4E34\u65F6\u8BA1\u5212\u4E0D\u80FD\u52A0\u5165\u5DF2\u6709\u8BFE\u7A0B");
   if (reason === "invalid-amount") throw new FamilyActionError("REFUND_EXCEEDS_PAYMENT", "\u9000\u6B3E\u91D1\u989D\u5E94\u5927\u4E8E 0\uFF0C\u4E14\u4E0D\u8D85\u8FC7\u5269\u4F59\u53EF\u9000\u91D1\u989D");
   if (reason === "not-paid" || reason === "payment-missing") throw new FamilyActionError("REFUND_NOT_ALLOWED", "\u5F53\u524D\u8D26\u5355\u65E0\u6CD5\u9000\u6B3E");
   throw new FamilyActionError("INVALID_INPUT", "\u8BF7\u5B8C\u6574\u586B\u5199\u540E\u518D\u4FDD\u5B58");
@@ -1898,6 +1899,7 @@ function createFamilyWorkspace(initial) {
     var _a;
     const course = snapshot.value.courses.find((item) => item.id === courseId);
     if (!course || course.archived) return { ok: false, reason: "invalid" };
+    if (course.source === "temporary") return { ok: false, reason: "temporary" };
     const dates = [...new Set((Array.isArray(date) ? date : [date]).filter(Boolean))].sort();
     if (!dates.length) return { ok: false, reason: "invalid" };
     const sample = (_a = course.recurrence.dates) == null ? void 0 : _a[0];

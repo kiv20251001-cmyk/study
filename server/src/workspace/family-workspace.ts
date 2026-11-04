@@ -1047,6 +1047,7 @@ export function createFamilyWorkspace(initial: AppSnapshot) {
   function addPresetOccurrence(courseId: string, date: string | string[]) {
     const course = snapshot.value.courses.find((item) => item.id === courseId)
     if (!course || course.archived) return { ok: false, reason: 'invalid' } as const
+    if (course.source === 'temporary') return { ok: false, reason: 'temporary' } as const
     const dates = [...new Set((Array.isArray(date) ? date : [date]).filter(Boolean))].sort()
     if (!dates.length) return { ok: false, reason: 'invalid' } as const
 

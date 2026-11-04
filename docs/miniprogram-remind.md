@@ -31,7 +31,7 @@
 
 ## 2. 时间轴上的闹钟
 
-按钮在 `apps/miniprogram/src/components/DayCourseList.vue`，今日和日历都会出现，贴在左侧时间旁边。只有还没开始的课才显示。
+按钮在 `apps/miniprogram/src/components/DayCourseList.vue`，今日和日历的课程色块上，课程图标上方，文案是「设置提醒」。只有还没开始的课才显示。
 
 点一下调用 `uni.requestSubscribeMessage`。一次调用里同一个模板 ID 只能出现一次，所以点一次、允许一次，只给这一节课增加 1 次额度。已经开过的课再点，只提示「这节课会在课前提醒你」，不再弹授权。拒绝时提示「还没开启提醒」，下次仍要点这个闹钟才会再问。
 

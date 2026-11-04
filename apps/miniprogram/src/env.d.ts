@@ -36,4 +36,9 @@ interface WxCloud {
 declare const wx: {
   cloud?: WxCloud
   getAccountInfoSync?: () => { miniProgram: { appId: string; envVersion: string; version?: string } }
+  requestSubscribeMessage?: (options: {
+    tmplIds: string[]
+    success?: (res: Record<string, unknown>) => void
+    fail?: (err: { errMsg?: string }) => void
+  }) => void
 }

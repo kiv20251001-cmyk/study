@@ -42,7 +42,7 @@ const saving = ref(false)
 const pickerOpen = ref(false)
 
 const sortedDates = computed(() => [...dates.value].filter(Boolean).sort())
-const courses = computed(() => store.overviewCourses)
+const courses = computed(() => store.overviewCourses.filter((course) => course.source !== 'temporary'))
 const selectedCourse = computed(() => courses.value.find((item) => item.id === courseId.value))
 const busyChildIds = computed(() => {
   if (selectedCourse.value) return courseParticipantIds(selectedCourse.value)

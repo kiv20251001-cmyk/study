@@ -18,6 +18,7 @@ function raiseObject(result: unknown) {
   const reason = 'reason' in result ? String(result.reason) : ''
   if (reason === 'conflict') throw new FamilyActionError('SCHEDULE_CONFLICT', '该孩子此时已有其他课程')
   if (reason === 'duplicate') throw new FamilyActionError('OCCURRENCE_DUPLICATE', '所选日期都已有这门课')
+  if (reason === 'temporary') throw new FamilyActionError('INVALID_INPUT', '临时计划不能加入已有课程')
   if (reason === 'invalid-amount') throw new FamilyActionError('REFUND_EXCEEDS_PAYMENT', '退款金额应大于 0，且不超过剩余可退金额')
   if (reason === 'not-paid' || reason === 'payment-missing') throw new FamilyActionError('REFUND_NOT_ALLOWED', '当前账单无法退款')
   throw new FamilyActionError('INVALID_INPUT', '请完整填写后再保存')

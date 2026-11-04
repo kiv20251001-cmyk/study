@@ -42,6 +42,7 @@ const quickForm = reactive({
 })
 
 const returnTo = computed(() => (route.path.startsWith('/') ? route.path : '/'))
+const presetCourses = computed(() => store.overviewCourses.filter((course) => course.source !== 'temporary'))
 const sortedDates = computed(() => [...selectedDates.value].filter(Boolean).sort())
 const firstDate = computed(() => sortedDates.value[0] ?? '')
 const busyChildIds = computed(() => {
@@ -145,6 +146,7 @@ async function submitPreset() {
       presetError.value = result.conflict ? scheduleConflictMessage(result.conflict) : '该孩子此时已有其他课程'
     }
     else if (result.reason === 'duplicate') presetError.value = '所选日期都已有这门课'
+    else if (result.reason === 'temporary') presetError.value = '临时计划不能加入已有课程'
     return
   }
   emit('added', firstDate.value)
@@ -194,9 +196,9 @@ async function submitTemporary() {
 
           <template v-if="addMode === 'preset'">
             <p class="preset-tip">老师、时间和地点将自动带入，添加后仍可单独调整这一次安排。</p>
-            <div v-if="store.overviewCourses.length" class="preset-list">
+            <div v-if="presetCourses.length" class="preset-list">
               <button
-                v-for="course in store.overviewCourses"
+                v-for="course in presetCourses"
                 :key="course.id"
                 type="button"
                 :disabled="courseScheduledOnAllDates(course.id)"
@@ -218,7 +220,7 @@ async function submitTemporary() {
             </div>
             <p v-if="presetError" class="quick-form-error">{{ presetError }}</p>
             <button
-              v-if="store.overviewCourses.length"
+              v-if="presetCourses.length"
               class="sheet-submit"
               type="button"
               :disabled="!selectedCourseId || !sortedDates.length"

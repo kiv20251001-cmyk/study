@@ -123,47 +123,82 @@ function canRemind(item: DayOccurrence) {
   return start > now.value
 }
 
+function tell(message: string) {
+  if (Array.from(message).length <= 7) {
+    uni.showToast({ icon: 'none', title: message })
+    return
+  }
+  uni.showModal({ title: '课前提醒', content: message, showCancel: false })
+}
+
+function subscribeStatus(result: Record<string, unknown>, id: string) {
+  const direct = result[id]
+  if (direct === 'accept' || direct === 'reject' || direct === 'ban' || direct === 'filter') return direct
+  for (const [key, value] of Object.entries(result)) {
+    if (key === 'errMsg') continue
+    if (value === 'accept' || value === 'reject' || value === 'ban' || value === 'filter') return value
+  }
+  return ''
+}
+
+function subscribeFailText(errMsg: string) {
+  const text = errMsg.toLowerCase()
+  if (text.includes('main switch') || text.includes('switched off')) {
+    return '请先在微信「设置 - 通知管理」里打开订阅消息，再点设置提醒。'
+  }
+  if (text.includes('template')) {
+    return '模板 ID 还没对上。请把后台的模板 ID 和 thing 编号填进配置，重新打包后再试。'
+  }
+  if (text.includes('tap gesture') || text.includes('user tap')) return '请再点一次「设置提醒」。'
+  if (text.includes('ban')) return '这则提醒被微信限制了，请到通知管理里查看。'
+  return '提醒没有打开。若弹出了窗口，请点「允许」。'
+}
+
 function subscribe(item: DayOccurrence) {
   if (!canRemind(item)) {
-    uni.showToast({ icon: 'none', title: '这节课已经开始了' })
+    tell('这节课已经开始了')
     return
   }
   if (!store.ready && !store.fromCache) {
-    uni.showToast({ icon: 'none', title: store.booting ? '正在读取课表…' : '请先创建或加入家庭' })
+    tell(store.booting ? '正在读取课表…' : '请先创建或加入家庭')
     return
   }
   if (store.remindKeys.includes(item.id)) {
-    uni.showToast({ icon: 'none', title: '这节课会在课前提醒你' })
+    tell('这节课会在课前提醒你')
     return
   }
   if (!templateId) {
-    uni.showToast({ icon: 'none', title: '提醒模板还没准备好' })
+    tell('提醒模板还没准备好。请先填写模板 ID，或等云端读到已选用的模板。')
     void loadRemindTemplate().then((found) => {
       templateId = found.id
     }).catch(() => {})
     return
   }
-  uni.requestSubscribeMessage({
-    tmplIds: [templateId],
-    success: (result) => {
-      const decision = (result as Record<string, string>)[templateId]
+  const id = templateId
+  const options = {
+    tmplIds: [id],
+    success: (result: Record<string, unknown>) => {
+      const decision = subscribeStatus(result, id)
       if (decision !== 'accept') {
-        uni.showToast({ icon: 'none', title: '还没开启提醒' })
+        if (decision === 'ban') tell('这则提醒被微信限制了，请到通知管理里查看。')
+        else if (decision === 'filter') tell('这套模板被微信过滤了。请到小程序后台确认模板已选用，且没有同名模板。')
+        else if (WX_ENV_VERSION === 'develop' && decision === 'reject') {
+          tell('开发者工具里经常不弹出允许窗口。请用手机预览，点「设置提醒」后在弹窗里点允许。')
+        } else tell('需要在弹窗里点「允许」，才会在课前 15 分钟提醒你。')
         return
       }
       void store.subscribeReminder(item.course.id, item.date, WX_ENV_VERSION).then((saved) => {
-        uni.showToast({
-          icon: 'none',
-          title: saved.late ? '已开启。离上课不足 15 分钟，可能来不及提醒' : '已开启，课前 15 分钟提醒你',
-        })
+        tell(saved.late ? '已开启。离上课不足 15 分钟，可能来不及提醒。' : '已开启。退出小程序后，会在课前约 15 分钟提醒你。')
       }).catch((error: unknown) => {
         showCloudError(error)
       })
     },
-    fail: () => {
-      uni.showToast({ icon: 'none', title: '还没开启提醒' })
+    fail: (error: { errMsg?: string }) => {
+      tell(subscribeFailText(String(error?.errMsg || '')))
     },
-  })
+  }
+  if (typeof wx !== 'undefined' && wx.requestSubscribeMessage) wx.requestSubscribeMessage(options)
+  else uni.requestSubscribeMessage(options)
 }
 
 function courseIcon(item: DayOccurrence) {
@@ -250,17 +285,6 @@ const rows = computed(() => {
     <view v-if="rows.length" class="lesson-list">
       <view v-for="(row, index) in rows" :key="row.item.id" class="timeline-entry">
         <view class="timeline-marker">
-          <button
-            v-if="canRemind(row.item)"
-            hover-class="press-on"
-            hover-stay-time="80"
-            class="alarm press"
-            :class="{ on: store.remindKeys.includes(row.item.id) }"
-            @click="subscribe(row.item)"
-          >
-            <AppIcon name="alarm" :tone="store.remindKeys.includes(row.item.id) ? 'accent' : 'muted'" :size="14" />
-          </button>
-          <view v-else class="alarm-spacer" />
           <view class="timeline-times">
             <text class="timeline-start" :style="row.startStyle">{{ row.start }}</text>
             <text class="timeline-end" :style="row.endStyle">{{ row.end }}</text>
@@ -281,6 +305,17 @@ const rows = computed(() => {
           </view>
           <view class="lesson-body">
             <view class="lesson-time" :style="row.tileStyle">
+              <button
+                v-if="canRemind(row.item)"
+                hover-class="press-on"
+                hover-stay-time="80"
+                class="alarm press"
+                :class="{ on: store.remindKeys.includes(row.item.id) }"
+                @click.stop="subscribe(row.item)"
+              >
+                <AppIcon name="alarm" tone="white" :size="12" />
+                <text>{{ store.remindKeys.includes(row.item.id) ? '已提醒' : '设置提醒' }}</text>
+              </button>
               <AppIcon :key="row.icon" :name="row.icon" tone="white" :size="26" />
             </view>
             <view class="lesson-copy">
@@ -404,28 +439,11 @@ const rows = computed(() => {
 .timeline-entry { display: flex; align-items: stretch; gap: 8px; margin-bottom: 12px; }
 .timeline-marker {
   display: flex;
-  width: 76px;
+  width: 52px;
   flex: 0 0 auto;
   align-items: stretch;
-  gap: 2px;
   padding-top: 2px;
 }
-.alarm, .alarm-spacer {
-  width: 22px;
-  flex: 0 0 22px;
-  align-self: center;
-}
-.alarm {
-  height: 22px;
-  min-height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--paper);
-  box-shadow: var(--elev-md);
-}
-.alarm.on { background: var(--accent-soft); }
 .timeline-times {
   display: flex;
   width: 36px;
@@ -527,14 +545,31 @@ const rows = computed(() => {
 .lesson-body { display: flex; align-items: flex-start; gap: 10px; }
 .lesson-time {
   display: flex;
-  width: 54px;
+  width: 78px;
   min-height: 102px;
   flex: 0 0 auto;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  padding: 8px 6px;
   border-radius: 16px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
 }
+.alarm {
+  display: flex;
+  width: 100%;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 3px 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.22);
+  line-height: 1;
+}
+.alarm text { color: #fff; font-size: 10px; font-weight: 700; }
+.alarm.on { background: rgba(255,255,255,.42); }
 .lesson-copy { min-width: 0; flex: 1; }
 .lesson-type {
   display: inline-block;

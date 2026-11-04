@@ -63,7 +63,7 @@
 | 临时安排 | 已落地 | Course+可选 Expense | 课程+账单同一事务 | `createQuickArrangement` | 同上 / 底栏 |
 | 改本次时间 / 金额 / 支付 | 已落地 | 例外 + 账单 | 改时间走同一冲突校验并置灰 | `upsertScheduleException` `upsertOccurrenceExpense` | `OccurrenceEditSheet` |
 | 取消本次 / 短时恢复 | 已落地 | 例外 | 删 `cancelled` 即恢复 | `dropOccurrenceSlot` `restoreOccurrenceSlot` | 今日/日历 toast |
-| 课前 15 分钟提醒 | 已落地 | 订阅记录 `reminders`，按点击的人 | 用户点允许后才可发；定时云函数到点发送 | `subscribeReminder` | 今日、日历时间轴闹钟 |
+| 课前 15 分钟提醒 | 已落地 | 订阅记录 `reminders`，按点击的人 | 用户点允许后才可发；定时云函数到点发送 | `subscribeReminder` | 今日、日历课程色块「设置提醒」 |
 | 确认已上 / 未上 | 部分 | `OccurrenceRecord` | 统计最终以确认为准 | `setOccurrenceAttendance` | 课次编辑；统计仍按日期推断 |
 
 冲突口径：只和该课 `childIds`（或当前孩子）自己的课比时间。取消课不占时段。
