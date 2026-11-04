@@ -349,7 +349,7 @@ const rows = computed(() => {
                 :class="{ on: store.remindKeys.includes(row.item.id) }"
                 @click.stop="subscribe(row.item)"
               >
-                <AppIcon name="alarm" tone="white" :size="12" />
+                <AppIcon name="alarm" tone="white" :size="13" />
                 <text>{{ store.remindKeys.includes(row.item.id) ? '已提醒' : '设置提醒' }}</text>
               </button>
               <AppIcon :key="row.icon" :name="row.icon" tone="white" :size="26" />
@@ -603,31 +603,41 @@ const rows = computed(() => {
 .lesson-body { display: flex; align-items: flex-start; gap: 10px; }
 .lesson-time {
   display: flex;
-  width: 78px;
+  width: 54px;
   min-height: 102px;
   flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 6px;
+  padding: 6px 2px;
+  box-sizing: border-box;
   border-radius: 16px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 .alarm {
   display: flex;
-  width: 100%;
-  min-height: 22px;
+  width: 46px;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 3px 0;
-  border-radius: 999px;
-  background: rgba(255,255,255,.22);
+  margin: 0;
+  padding: 4px 1px 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.22);
   line-height: 1;
 }
-.alarm text { color: #fff; font-size: 10px; font-weight: 700; }
-.alarm.on { background: rgba(255,255,255,.42); }
+.alarm::after { border: 0; }
+.alarm text {
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.alarm.on { background: rgba(255, 255, 255, 0.42); }
 .lesson-copy { min-width: 0; flex: 1; }
 .lesson-type {
   display: inline-block;
