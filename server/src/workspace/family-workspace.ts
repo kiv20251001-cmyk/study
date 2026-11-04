@@ -309,6 +309,9 @@ export function createFamilyWorkspace(initial: AppSnapshot) {
     )
     snapshot.value.payments = (snapshot.value.payments ?? []).filter((item) => item.childId !== id)
     snapshot.value.goals = snapshot.value.goals.filter((item) => item.childId !== id)
+    if (snapshot.value.homework) {
+      snapshot.value.homework = snapshot.value.homework.filter((item) => item.childId !== id)
+    }
     snapshot.value.children.splice(childIndex, 1)
 
     if (snapshot.value.session.childId === id) {
@@ -336,6 +339,52 @@ export function createFamilyWorkspace(initial: AppSnapshot) {
     course.note = note.trim().slice(0, 200)
     persist()
     return 'updated' as const
+  }
+
+  function saveHomework(input: { id?: string; date: string; subject: string; content: string; note?: string }) {
+    const subject = input.subject.trim().slice(0, 20)
+    const content = input.content.trim().slice(0, 1000)
+    const note = (input.note ?? '').trim().slice(0, 200)
+    if (!subject || !content || !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return 'invalid' as const
+    const list = snapshot.value.homework ?? (snapshot.value.homework = [])
+    if (input.id) {
+      const existing = list.find((item) => item.id === input.id)
+      if (!existing) return 'not-found' as const
+      Object.assign(existing, { date: input.date, subject, content, note })
+      persist()
+      return existing.id
+    }
+    const id = createId('hw')
+    list.push({
+      id,
+      childId: childId.value,
+      date: input.date,
+      subject,
+      content,
+      note,
+      done: false,
+      createdAt: new Date().toISOString(),
+    })
+    persist()
+    return id
+  }
+
+  function setHomeworkDone(id: string, done: boolean) {
+    const item = snapshot.value.homework?.find((entry) => entry.id === id)
+    if (!item) return 'not-found' as const
+    item.done = done
+    if (done) item.doneAt = new Date().toISOString()
+    else delete item.doneAt
+    persist()
+    return id
+  }
+
+  function removeHomework(id: string) {
+    const list = snapshot.value.homework ?? []
+    if (!list.some((item) => item.id === id)) return 'not-found' as const
+    snapshot.value.homework = list.filter((item) => item.id !== id)
+    persist()
+    return 'removed' as const
   }
 
   function findExpense(expenseId: string) {
@@ -1365,6 +1414,9 @@ export function createFamilyWorkspace(initial: AppSnapshot) {
     selectChild,
     findCourse,
     updateCourseNote,
+    saveHomework,
+    setHomeworkDone,
+    removeHomework,
     findExpense,
     findOccurrenceExpense,
     upsertCourse,

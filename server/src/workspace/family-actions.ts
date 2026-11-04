@@ -112,6 +112,25 @@ export function applyFamilyAction(workspace: Workspace, action: string, payload:
         'not-found': ['COURSE_NOT_FOUND', '课程不存在'],
         'not-temporary': ['INVALID_INPUT', '只有临时计划可以改备注'],
       })
+    case 'saveHomework':
+      return raiseCode(workspace.saveHomework({
+        id: typeof payload.id === 'string' && payload.id ? payload.id : undefined,
+        date: String(payload.date || ''),
+        subject: String(payload.subject || ''),
+        content: String(payload.content || ''),
+        note: typeof payload.note === 'string' ? payload.note : '',
+      }), {
+        invalid: ['INVALID_INPUT', '请填写作业科目和作业内容'],
+        'not-found': ['HOMEWORK_NOT_FOUND', '这条作业已经不在了'],
+      })
+    case 'setHomeworkDone':
+      return raiseCode(workspace.setHomeworkDone(String(payload.id || ''), Boolean(payload.done)), {
+        'not-found': ['HOMEWORK_NOT_FOUND', '这条作业已经不在了'],
+      })
+    case 'removeHomework':
+      return raiseCode(workspace.removeHomework(String(payload.id || '')), {
+        'not-found': ['HOMEWORK_NOT_FOUND', '这条作业已经不在了'],
+      })
     case 'quickArrangement':
       return raiseObject(workspace.createQuickArrangement({
         dates: payload.dates as string[] | undefined,

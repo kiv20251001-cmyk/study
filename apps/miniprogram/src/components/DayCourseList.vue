@@ -7,8 +7,9 @@ import { courseCardFee } from '@server-domain/charges'
 import { buildCourseBillLedger } from '@server-domain/courseBills'
 import { courseScheduleProgress } from '@server-domain/courseSchedule'
 import { money } from '@server-domain/billing'
-import type { DayOccurrence } from '@server-domain/types'
+import type { DayOccurrence, Homework } from '@server-domain/types'
 import { showCloudError } from '@/cloud/call'
+import { homeworkOn } from '@/domain/homework'
 import { WX_ENV_VERSION } from '@/config'
 import { useFamilyStore } from '@/stores/family'
 import { loadRemindTemplate } from '@/utils/remind'
@@ -20,6 +21,7 @@ import { cardBackground, currentMixBase, deepTone, mix, tileBackground } from '@
 import AppIcon from '@/components/AppIcon.vue'
 import EmptyHint from '@/components/EmptyHint.vue'
 import ChildAvatar from '@/components/ChildAvatar.vue'
+import HomeworkCard from '@/components/HomeworkCard.vue'
 
 const props = withDefaults(defineProps<{
   title: string
@@ -37,6 +39,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   add: []
   edit: [item: DayOccurrence]
+  editHomework: [item: Homework]
 }>()
 
 const store = useFamilyStore()
@@ -201,6 +204,38 @@ function subscribe(item: DayOccurrence) {
   else uni.requestSubscribeMessage(options)
 }
 
+const homeworkRows = computed(() => (props.date ? homeworkOn(store.homework, props.date) : []))
+const homeworkDone = computed(() => homeworkRows.value.filter((item) => item.done).length)
+const swipedId = ref('')
+const toggling = ref(false)
+
+function homeworkMissed(item: Homework) {
+  return !item.done && item.date < dayjs().format('YYYY-MM-DD')
+}
+
+function closeSwipe(id: string) {
+  if (swipedId.value === id) swipedId.value = ''
+}
+
+function editHomework(item: Homework) {
+  swipedId.value = ''
+  emit('editHomework', item)
+}
+
+async function toggleHomework(item: Homework) {
+  if (toggling.value) return
+  toggling.value = true
+  swipedId.value = ''
+  try {
+    await store.setHomeworkDone(item.id, !item.done)
+    uni.showToast({ icon: 'none', title: item.done ? '已改回未完成' : '作业已完成' })
+  } catch (error) {
+    showCloudError(error)
+  } finally {
+    toggling.value = false
+  }
+}
+
 function courseIcon(item: DayOccurrence) {
   const live = store.snapshot.courses.find((course) => course.id === item.course.id)
   return live?.icon || item.course.icon || 'generic'
@@ -282,6 +317,7 @@ const rows = computed(() => {
       </button>
     </view>
 
+    <template v-if="rows.length || homeworkRows.length">
     <view v-if="rows.length" class="lesson-list">
       <view v-for="(row, index) in rows" :key="row.item.id" class="timeline-entry">
         <view class="timeline-marker">
@@ -366,6 +402,28 @@ const rows = computed(() => {
         </view>
       </view>
     </view>
+
+    <view v-if="homeworkRows.length" class="homework-block">
+      <view class="homework-head">
+        <view class="homework-dot" />
+        <text class="homework-title">课堂作业</text>
+        <text class="homework-count">{{ homeworkDone }}/{{ homeworkRows.length }} 已完成</text>
+        <text v-if="!readonly" class="homework-hint">左滑可编辑、完成</text>
+      </view>
+      <HomeworkCard
+        v-for="item in homeworkRows"
+        :key="item.id"
+        :homework="item"
+        :missed="homeworkMissed(item)"
+        :readonly="readonly"
+        :opened="swipedId === item.id"
+        @open="swipedId = item.id"
+        @close="closeSwipe(item.id)"
+        @edit="editHomework(item)"
+        @toggle="toggleHomework(item)"
+      />
+    </view>
+    </template>
 
     <view v-else-if="store.booting" class="boot-list">
       <view v-for="n in 2" :key="n" class="boot-row">
@@ -635,6 +693,13 @@ const rows = computed(() => {
 .progress-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .progress-track { height: 5px; border-radius: 999px; overflow: hidden; }
 .progress-track view { height: 100%; border-radius: 999px; }
+.homework-block { margin-top: 6px; }
+.lesson-list + .homework-block { margin-top: 18px; }
+.homework-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding-left: 2px; }
+.homework-dot { width: 7px; height: 7px; border-radius: 50%; background: #6c63ff; box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.18); }
+.homework-title { color: var(--ink); font-size: 14px; font-weight: 800; }
+.homework-count { color: var(--muted); font-size: 11px; font-weight: 650; }
+.homework-hint { margin-left: auto; color: var(--faint); font-size: 10px; }
 .empty-card {
   border-radius: 24px;
   background: var(--paper);

@@ -316,6 +316,17 @@
 
 错误：`TEMPLATE_MISSING` 后台没有可用模板；`OCCURRENCE_GONE` 这节课已取消或不存在；`ALREADY_STARTED` 已经开始。
 
+## 小程序课堂作业
+
+存在家庭快照 `homework[]`（`Homework`：`id` `childId` `date` `subject` `content` `note` `done` `doneAt` `createdAt`）。一条作业只属于一天，`childId` 取保存时的当前孩子；今日和日历展示全部作业，不按当前孩子过滤。删除孩子时一并删除他的作业。
+
+- `saveHomework`：没有 `id` 时新增，有 `id` 时修改日期、科目、内容、备注。科目 ≤20 字、内容 ≤1000 字（保留换行）、备注 ≤200 字；科目和内容必填。
+- `setHomeworkDone`：`{ id, done }`，完成时写 `doneAt`，改回未完成时清掉。
+- `removeHomework`：`{ id }`。
+- 权限：创建者、家长可写；家人只读，写入返回 `SCOPE_FORBIDDEN`。
+- 错误：`INVALID_INPUT` 科目或内容为空；`HOMEWORK_NOT_FOUND` 作业不存在。
+- 日期格状态：没有作业不显示；全部完成为 done；有未完成且日期早于今天为 missed；其余为 pending。
+
 ## 新功能记录模板
 
 ### [功能名]

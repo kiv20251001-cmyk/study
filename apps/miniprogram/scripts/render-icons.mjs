@@ -21,6 +21,9 @@ const course = {
 const ui = {
   clock: '<circle cx="12" cy="12" r="8.4"/><path d="M12 7.4V12l3.3 2"/>',
   alarm: '<path d="M5 4.5 7.2 6.4M19 4.5 16.8 6.4"/><circle cx="12" cy="13" r="6.6"/><path d="M12 10v3.2l2.2 1.3M6.2 19.2 4.8 21M17.8 19.2 19.2 21"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  edit: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Zm9.5-13.5 4 4"/>',
+  undo: '<path d="M9 7 5 11l4 4"/><path d="M5 11h9a5 5 0 0 1 0 10h-2"/>',
   calendar: '<path d="M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm2-2v4m10-4v4M4 10h16M8 14h2m4 0h2m-8 3h2m4 0h2"/>',
   book: '<path d="M4 5.5c3-.8 5.7-.2 8 1.8v12c-2.3-2-5-2.6-8-1.8v-12Zm16 0c-3-.8-5.7-.2-8 1.8v12c2.3-2 5-2.6 8-1.8v-12Z"/>',
   bars: '<path d="M5 20V10h3v10H5Zm6 0V4h3v16h-3Zm6 0v-7h3v7h-3Z"/>',

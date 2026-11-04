@@ -68,19 +68,27 @@ const TEXT_LIMITS: Record<string, number> = {
   location: 60,
   note: 300,
   code: 16,
+  subject: 20,
+  content: 1000,
 }
 const DEFAULT_TEXT_LIMIT = 200
 const UNSAFE_CHARS = /[\u0000-\u001F\u007F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF<>]/g
+/** 从群里粘贴的作业要保留分行。 */
+const MULTILINE_KEYS = new Set(['content'])
+const UNSAFE_MULTILINE_CHARS = /[\u0000-\u0009\u000B-\u001F\u007F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF<>]/g
 
-function cleanString(value: string, max: number) {
-  const chars = Array.from(value.replace(UNSAFE_CHARS, '').trim())
+function cleanString(value: string, max: number, multiline = false) {
+  const text = multiline
+    ? value.replace(/\r\n?/g, '\n').replace(UNSAFE_MULTILINE_CHARS, '').replace(/\n{3,}/g, '\n\n')
+    : value.replace(UNSAFE_CHARS, '')
+  const chars = Array.from(text.trim())
   return chars.length > max ? chars.slice(0, max).join('').trim() : chars.join('')
 }
 
 /** 客户端传来的所有字符串去掉控制字符、零宽字符和尖括号，并限制长度。 */
 function sanitizePayload(value: unknown, key = '', depth = 0): unknown {
   if (depth > 8) return undefined
-  if (typeof value === 'string') return cleanString(value, TEXT_LIMITS[key] ?? DEFAULT_TEXT_LIMIT)
+  if (typeof value === 'string') return cleanString(value, TEXT_LIMITS[key] ?? DEFAULT_TEXT_LIMIT, MULTILINE_KEYS.has(key))
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0
   if (Array.isArray(value)) return value.slice(0, 500).map((item) => sanitizePayload(item, key, depth + 1))
   if (value && typeof value === 'object') {

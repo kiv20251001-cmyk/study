@@ -2,14 +2,16 @@
 import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { occurrencesOnDate } from '@server-domain/schedule'
-import type { DayOccurrence } from '@server-domain/types'
+import type { DayOccurrence, Homework } from '@server-domain/types'
 import { showCloudError } from '@/cloud/call'
+import { homeworkStatusMap } from '@/domain/homework'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
 import { monthMatrix, occurrenceDots } from '@/utils/view'
 import PageHeader from '@/components/PageHeader.vue'
 import DayCourseList from '@/components/DayCourseList.vue'
 import AddSheet from '@/components/AddSheet.vue'
+import HomeworkBadge from '@/components/HomeworkBadge.vue'
 import OccurrenceSheet from '@/components/OccurrenceSheet.vue'
 
 defineProps<{ active: boolean }>()
@@ -18,6 +20,7 @@ const store = useFamilyStore()
 const ui = useUiStore()
 const cursor = ref(dayjs().format('YYYY-MM'))
 const addOpen = ref(false)
+const editingHomework = ref<Homework | null>(null)
 const editing = ref<DayOccurrence | null>(null)
 const cancelled = ref<DayOccurrence | null>(null)
 
@@ -27,11 +30,23 @@ watch([addOpen, editing], () => {
 
 function openAdd() {
   if (!store.canWrite) return
+  editingHomework.value = null
   addOpen.value = true
 }
 
 function openEdit(item: DayOccurrence) {
   editing.value = item
+}
+
+function openHomework(item: Homework) {
+  if (!store.canWrite) return
+  editingHomework.value = item
+  addOpen.value = true
+}
+
+function closeAdd() {
+  addOpen.value = false
+  editingHomework.value = null
 }
 
 const cells = computed(() => monthMatrix(cursor.value))
@@ -42,7 +57,9 @@ const items = computed(() =>
 const cellColors = computed(() => cells.value.map((date) => date
   ? occurrenceDots(store.overviewCourses, date, store.overviewScheduleExceptions)
   : []))
+const cellHomework = computed(() => homeworkStatusMap(store.homework, cells.value, ui.today))
 const cellViews = computed(() => cells.value.map((date, index) => ({
+  homework: date ? cellHomework.value[date] ?? 'none' : 'none',
   date,
   label: date ? Number(date.slice(8, 10)) : '',
   muted: Boolean(date) && date!.slice(0, 7) !== cursor.value,
@@ -119,6 +136,7 @@ async function undoCancel() {
             :class="{ muted: cell.muted, today: cell.today, on: cell.on }"
             @click="cell.date && pick(cell.date)"
           >
+            <HomeworkBadge v-if="cell.date" :status="cell.homework" :size="10" />
             <text>{{ cell.label }}</text>
             <view class="dots">
               <view v-for="dot in cell.colors" :key="dot.id" :style="{ background: dot.color }" />
@@ -134,12 +152,13 @@ async function undoCancel() {
         :hide-fee="!store.canViewBills"
         @add="openAdd"
         @edit="openEdit"
+        @edit-homework="openHomework"
       />
       <view v-if="cancelled" class="undo">
         <text>已取消“{{ cancelled.course.title }}”</text>
         <button hover-class="press-on" hover-stay-time="80" @click="undoCancel">撤销</button>
       </view>
-      <AddSheet v-if="store.canWrite && addOpen" :open="addOpen" :date="ui.selectedDate" @close="addOpen = false" />
+      <AddSheet v-if="store.canWrite && addOpen" :open="addOpen" :date="ui.selectedDate" :homework="editingHomework" @close="closeAdd" />
       <OccurrenceSheet v-if="editing" :item="editing" :readonly="!store.canWrite" @close="editing = null" @cancelled="cancelled = $event" />
     </view>
 </template>
@@ -176,6 +195,7 @@ async function undoCancel() {
 .week text, .day { width: 14.28%; }
 .week { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
 .day {
+  position: relative;
   height: 46px;
   display: flex;
   flex-direction: column;

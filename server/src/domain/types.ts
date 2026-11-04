@@ -218,6 +218,20 @@ export interface AppSnapshot {
   charges?: Charge[]
   payments?: Payment[]
   billingMigrationAudits?: BillingMigrationAudit[]
+  /** 某一天老师布置的作业，没有上课时间，不参与排课和计费。 */
+  homework?: Homework[]
+}
+
+export interface Homework {
+  id: string
+  childId: string
+  date: string
+  subject: string
+  content: string
+  note: string
+  done: boolean
+  doneAt?: string
+  createdAt: string
 }
 
 export interface DayOccurrence {

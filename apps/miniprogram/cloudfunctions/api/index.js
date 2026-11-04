@@ -639,6 +639,25 @@ function applyFamilyAction(workspace, action, payload) {
         "not-found": ["COURSE_NOT_FOUND", "\u8BFE\u7A0B\u4E0D\u5B58\u5728"],
         "not-temporary": ["INVALID_INPUT", "\u53EA\u6709\u4E34\u65F6\u8BA1\u5212\u53EF\u4EE5\u6539\u5907\u6CE8"]
       });
+    case "saveHomework":
+      return raiseCode(workspace.saveHomework({
+        id: typeof payload.id === "string" && payload.id ? payload.id : void 0,
+        date: String(payload.date || ""),
+        subject: String(payload.subject || ""),
+        content: String(payload.content || ""),
+        note: typeof payload.note === "string" ? payload.note : ""
+      }), {
+        invalid: ["INVALID_INPUT", "\u8BF7\u586B\u5199\u4F5C\u4E1A\u79D1\u76EE\u548C\u4F5C\u4E1A\u5185\u5BB9"],
+        "not-found": ["HOMEWORK_NOT_FOUND", "\u8FD9\u6761\u4F5C\u4E1A\u5DF2\u7ECF\u4E0D\u5728\u4E86"]
+      });
+    case "setHomeworkDone":
+      return raiseCode(workspace.setHomeworkDone(String(payload.id || ""), Boolean(payload.done)), {
+        "not-found": ["HOMEWORK_NOT_FOUND", "\u8FD9\u6761\u4F5C\u4E1A\u5DF2\u7ECF\u4E0D\u5728\u4E86"]
+      });
+    case "removeHomework":
+      return raiseCode(workspace.removeHomework(String(payload.id || "")), {
+        "not-found": ["HOMEWORK_NOT_FOUND", "\u8FD9\u6761\u4F5C\u4E1A\u5DF2\u7ECF\u4E0D\u5728\u4E86"]
+      });
     case "quickArrangement":
       return raiseObject(workspace.createQuickArrangement({
         dates: payload.dates,
@@ -1243,6 +1262,9 @@ function createFamilyWorkspace(initial) {
     );
     snapshot.value.payments = (snapshot.value.payments ?? []).filter((item) => item.childId !== id);
     snapshot.value.goals = snapshot.value.goals.filter((item) => item.childId !== id);
+    if (snapshot.value.homework) {
+      snapshot.value.homework = snapshot.value.homework.filter((item) => item.childId !== id);
+    }
     snapshot.value.children.splice(childIndex, 1);
     if (snapshot.value.session.childId === id) {
       snapshot.value.session.childId = snapshot.value.children[0].id;
@@ -1265,6 +1287,50 @@ function createFamilyWorkspace(initial) {
     course.note = note.trim().slice(0, 200);
     persist();
     return "updated";
+  }
+  function saveHomework(input) {
+    const subject = input.subject.trim().slice(0, 20);
+    const content = input.content.trim().slice(0, 1e3);
+    const note = (input.note ?? "").trim().slice(0, 200);
+    if (!subject || !content || !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return "invalid";
+    const list = snapshot.value.homework ?? (snapshot.value.homework = []);
+    if (input.id) {
+      const existing = list.find((item) => item.id === input.id);
+      if (!existing) return "not-found";
+      Object.assign(existing, { date: input.date, subject, content, note });
+      persist();
+      return existing.id;
+    }
+    const id = createId("hw");
+    list.push({
+      id,
+      childId: childId.value,
+      date: input.date,
+      subject,
+      content,
+      note,
+      done: false,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    persist();
+    return id;
+  }
+  function setHomeworkDone(id, done) {
+    var _a;
+    const item = (_a = snapshot.value.homework) == null ? void 0 : _a.find((entry) => entry.id === id);
+    if (!item) return "not-found";
+    item.done = done;
+    if (done) item.doneAt = (/* @__PURE__ */ new Date()).toISOString();
+    else delete item.doneAt;
+    persist();
+    return id;
+  }
+  function removeHomework(id) {
+    const list = snapshot.value.homework ?? [];
+    if (!list.some((item) => item.id === id)) return "not-found";
+    snapshot.value.homework = list.filter((item) => item.id !== id);
+    persist();
+    return "removed";
   }
   function findExpense(expenseId) {
     return snapshot.value.expenses.find((item) => item.id === expenseId);
@@ -2192,6 +2258,9 @@ function createFamilyWorkspace(initial) {
     selectChild,
     findCourse,
     updateCourseNote,
+    saveHomework,
+    setHomeworkDone,
+    removeHomework,
     findExpense,
     findOccurrenceExpense,
     upsertCourse,
@@ -2510,17 +2579,22 @@ var TEXT_LIMITS = {
   teacher: 20,
   location: 60,
   note: 300,
-  code: 16
+  code: 16,
+  subject: 20,
+  content: 1e3
 };
 var DEFAULT_TEXT_LIMIT = 200;
 var UNSAFE_CHARS = /[\u0000-\u001F\u007F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF<>]/g;
-function cleanString(value, max) {
-  const chars = Array.from(value.replace(UNSAFE_CHARS, "").trim());
+var MULTILINE_KEYS = /* @__PURE__ */ new Set(["content"]);
+var UNSAFE_MULTILINE_CHARS = /[\u0000-\u0009\u000B-\u001F\u007F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF<>]/g;
+function cleanString(value, max, multiline = false) {
+  const text = multiline ? value.replace(/\r\n?/g, "\n").replace(UNSAFE_MULTILINE_CHARS, "").replace(/\n{3,}/g, "\n\n") : value.replace(UNSAFE_CHARS, "");
+  const chars = Array.from(text.trim());
   return chars.length > max ? chars.slice(0, max).join("").trim() : chars.join("");
 }
 function sanitizePayload(value, key = "", depth = 0) {
   if (depth > 8) return void 0;
-  if (typeof value === "string") return cleanString(value, TEXT_LIMITS[key] ?? DEFAULT_TEXT_LIMIT);
+  if (typeof value === "string") return cleanString(value, TEXT_LIMITS[key] ?? DEFAULT_TEXT_LIMIT, MULTILINE_KEYS.has(key));
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (Array.isArray(value)) return value.slice(0, 500).map((item) => sanitizePayload(item, key, depth + 1));
   if (value && typeof value === "object") {

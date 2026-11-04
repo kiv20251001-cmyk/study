@@ -10,6 +10,8 @@ export const TEXT_LIMIT = {
   note: 200,
   expenseTitle: 20,
   refundNote: 50,
+  homeworkSubject: 12,
+  homeworkContent: 1000,
   /** 金额输入框字符数：最多 6 位整数 + 小数点 + 2 位小数 */
   amount: 9,
 } as const

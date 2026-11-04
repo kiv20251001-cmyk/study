@@ -9,6 +9,7 @@ import type {
   Course,
   Expense,
   ExpenseStatus,
+  Homework,
   OccurrenceAttendance,
   Payment,
   ScheduleException,
@@ -248,6 +249,10 @@ export const useFamilyStore = defineStore('family', {
     },
     overviewPayments(state): Payment[] {
       return state.snapshot.payments ?? []
+    },
+    /** 和今日课表一样不按当前孩子拆开，切孩子后作业不会消失。 */
+    homework(state): Homework[] {
+      return state.snapshot.homework ?? []
     },
     /** 还没有上次课表，云端也还没回来：今日计划画骨架，不要画成当天没课。 */
     booting(): boolean {
@@ -494,6 +499,15 @@ export const useFamilyStore = defineStore('family', {
     },
     removeExpense(id: string) {
       return this.dispatch('removeExpense', { id })
+    },
+    saveHomework(input: { id?: string; date: string; subject: string; content: string; note: string }) {
+      return this.dispatch<string>('saveHomework', input)
+    },
+    setHomeworkDone(id: string, done: boolean) {
+      return this.dispatch('setHomeworkDone', { id, done })
+    },
+    removeHomework(id: string) {
+      return this.dispatch('removeHomework', { id })
     },
     /** 今天及以后、已经订阅成功的课。失败时保持原样，下次再问。 */
     async loadReminders() {

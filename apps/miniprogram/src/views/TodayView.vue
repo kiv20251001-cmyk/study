@@ -5,8 +5,9 @@ import { WEEKDAY_SHORT } from '@server-domain/constants'
 import { occurrencesOnDate } from '@server-domain/schedule'
 import { billNetAmount, billsInDueRange, money } from '@server-domain/billing'
 import { sumUnbilledCharges } from '@server-domain/charges'
-import type { DayOccurrence } from '@server-domain/types'
+import type { DayOccurrence, Homework } from '@server-domain/types'
 import { showCloudError } from '@/cloud/call'
+import { homeworkStatusMap } from '@/domain/homework'
 import { onViewShow } from '@/composables/useTabView'
 import { useFamilyStore } from '@/stores/family'
 import { useUiStore } from '@/stores/ui'
@@ -15,6 +16,7 @@ import { occurrenceDots, weekDates, weekLabel } from '@/utils/view'
 import AppIcon from '@/components/AppIcon.vue'
 import DayCourseList from '@/components/DayCourseList.vue'
 import AddSheet from '@/components/AddSheet.vue'
+import HomeworkBadge from '@/components/HomeworkBadge.vue'
 import OccurrenceSheet from '@/components/OccurrenceSheet.vue'
 
 const props = defineProps<{ active: boolean }>()
@@ -22,6 +24,7 @@ const emit = defineEmits<{ cover: [covered: boolean] }>()
 const store = useFamilyStore()
 const ui = useUiStore()
 const addOpen = ref(false)
+const editingHomework = ref<Homework | null>(null)
 const editing = ref<DayOccurrence | null>(null)
 const cancelled = ref<DayOccurrence | null>(null)
 let undoTimer: ReturnType<typeof setTimeout> | undefined
@@ -30,11 +33,23 @@ const clock = ref(dayjs().format('HH:mm'))
 
 function openAdd() {
   if (!store.canWrite) return
+  editingHomework.value = null
   addOpen.value = true
 }
 
 function openEdit(item: DayOccurrence) {
   editing.value = item
+}
+
+function openHomework(item: Homework) {
+  if (!store.canWrite) return
+  editingHomework.value = item
+  addOpen.value = true
+}
+
+function closeAdd() {
+  addOpen.value = false
+  editingHomework.value = null
 }
 
 function openBills() {
@@ -96,11 +111,13 @@ const dayDonePercent = computed(() => {
   return Math.round((done / total) * 100)
 })
 
+const weekHomework = computed(() => homeworkStatusMap(store.homework, days.value, ui.today))
 const dayViews = computed(() => days.value.map((date) => ({
   date,
   weekday: WEEKDAY_SHORT[dayjs(date).day()],
   num: Number(date.slice(8, 10)),
   colors: occurrenceDots(store.overviewCourses, date, store.overviewScheduleExceptions),
+  homework: weekHomework.value[date] ?? 'none',
 })))
 const isToday = computed(() => ui.selectedDate === ui.today)
 const selectedLabel = computed(() => dayjs(ui.selectedDate).format('M月D日'))
@@ -163,6 +180,7 @@ async function undoCancel() {
             :class="{ active: day.date === ui.selectedDate, today: day.date === ui.today }"
             @click="ui.selectedDate = day.date"
           >
+            <HomeworkBadge :status="day.homework" :inverse="day.date === ui.selectedDate" :size="11" />
             <text>{{ day.weekday }}</text>
             <text class="num">{{ day.num }}</text>
             <view class="course-dots">
@@ -229,13 +247,14 @@ async function undoCancel() {
         :hide-fee="!store.canViewBills"
         @add="openAdd"
         @edit="openEdit"
+        @edit-homework="openHomework"
       />
 
       <view v-if="cancelled" class="undo">
         <text>已取消“{{ cancelled.course.title }}”</text>
         <button hover-class="press-on" hover-stay-time="80" @click="undoCancel">撤销</button>
       </view>
-      <AddSheet v-if="store.canWrite && addOpen" :open="addOpen" :date="ui.selectedDate" @close="addOpen = false" />
+      <AddSheet v-if="store.canWrite && addOpen" :open="addOpen" :date="ui.selectedDate" :homework="editingHomework" @close="closeAdd" />
       <OccurrenceSheet v-if="editing" :item="editing" :readonly="!store.canWrite" @close="editing = null" @cancelled="rememberCancel" />
   </view>
 </template>
@@ -266,6 +285,7 @@ async function undoCancel() {
 .week-toolbar text { color: var(--muted); font-size: 11px; font-weight: 650; }
 .date-strip { display: flex; gap: 4px; }
 .date-strip button {
+  position: relative;
   flex: 1;
   height: 62px;
   display: flex;

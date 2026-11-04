@@ -218,6 +218,20 @@ export interface AppSnapshot {
   charges?: Charge[]
   payments?: Payment[]
   billingMigrationAudits?: BillingMigrationAudit[]
+  /** 小程序记录的作业。H5 暂不展示，只保持契约一致。 */
+  homework?: Homework[]
+}
+
+export interface Homework {
+  id: string
+  childId: string
+  date: string
+  subject: string
+  content: string
+  note: string
+  done: boolean
+  doneAt?: string
+  createdAt: string
 }
 
 export interface DayOccurrence {
