@@ -573,13 +573,9 @@ var FamilyActionError = class extends Error {
 };
 
 // src/domain/remind.ts
-var REMIND_TEMPLATE_ID = "";
-var REMIND_TEMPLATE_FIELDS = {
-  title: "thing1",
-  time: "thing2",
-  location: "thing3",
-  note: "thing4"
-};
+var import_remind_config = __toESM(require("./remind.config.json"));
+var REMIND_TEMPLATE_ID = import_remind_config.default.templateId;
+var REMIND_TEMPLATE_FIELDS = import_remind_config.default.fields;
 var FIELD_LABELS = {
   title: ["\u8BA1\u5212\u540D\u79F0", "\u8BFE\u7A0B\u540D\u79F0", "\u8BFE\u7A0B\u540D"],
   time: ["\u5F00\u59CB\u65F6\u95F4", "\u4E0A\u8BFE\u65F6\u95F4"],
@@ -677,6 +673,7 @@ function extractTemplates(result) {
 async function fetchTemplateList() {
   const api = import_wx_server_sdk.default;
   const attempts = [
+    () => api.openapi.subscribeMessage.getTemplateList({}),
     () => api.openapi.wxaapi.newtmpl.gettemplate({}),
     () => api.openapi.newtmpl.gettemplate({}),
     () => api.openapi.subscribeMessage.getTemplate({}),

@@ -1,19 +1,14 @@
-/**
- * 课前提醒模板的唯一配置。小程序和两个云函数都从这里读。
- * `cloudfunctions/api/index.js`、`cloudfunctions/remind/index.js` 是打包进去的副本，不要手改。
- * 改完后在 `apps/miniprogram` 执行 `npm run build:cloud`，再重新上传 `api` 和 `remind`。
- *
- * 微信发送接口的键名不带 `.DATA`。后台模板写 `{{thing3.DATA}}`，这里填 `thing3`。
- */
-export const REMIND_TEMPLATE_ID = ''
+import config from './remind.config.json'
 
-/** 计划名称、开始时间、地点、备注。留空模板 ID 时，云函数改为按后台模板正文识别这些键。 */
-export const REMIND_TEMPLATE_FIELDS = {
-  title: 'thing1',
-  time: 'thing2',
-  location: 'thing3',
-  note: 'thing4',
-} as const
+/**
+ * 模板 ID 和 thing 编号只改 `remind.config.json`。
+ * 小程序、api 云函数、remind 云函数都读这一份。
+ * 改完后在 `apps/miniprogram` 执行 `npm run build:cloud`，再上传 `api` 和 `remind`。
+ * 微信发送接口的键名不带 `.DATA`。后台写 `{{thing3.DATA}}`，这里填 `thing3`。
+ * 模板 ID 留空时，云函数按后台模板正文识别键名。
+ */
+export const REMIND_TEMPLATE_ID = config.templateId
+export const REMIND_TEMPLATE_FIELDS: RemindFields = config.fields
 
 export interface RemindFields {
   title: string

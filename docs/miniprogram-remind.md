@@ -35,7 +35,7 @@
 
 点一下调用 `uni.requestSubscribeMessage`。一次调用里同一个模板 ID 只能出现一次，所以点一次、允许一次，只给这一节课增加 1 次额度。已经开过的课再点，只提示「这节课会在课前提醒你」，不再弹授权。拒绝时提示「还没开启提醒」，下次仍要点这个闹钟才会再问。
 
-模板只维护 `apps/miniprogram/src/domain/remind.ts`。`cloudfunctions/api/index.js` 和 `cloudfunctions/remind/index.js` 里的同名常量是打包副本，手改会被下次打包覆盖。后台模板写 `{{thing3.DATA}}` 时，配置里填 `thing3`，不要带 `.DATA`。留空模板 ID 时，云函数按模板正文识别键名。改完执行 `npm run build:cloud`，再上传 `api` 和 `remind`。
+模板 ID 和 thing 编号只改 `apps/miniprogram/src/domain/remind.config.json`。小程序和两个云函数都读这一份。后台模板写 `{{thing3.DATA}}` 时，`fields` 里填 `thing3`，不要带 `.DATA`。`templateId` 留空时，云函数按模板正文识别键名。改完执行 `npm run build:cloud`，再上传 `api` 和 `remind`。不要改 `index.js` 里的副本。
 
 怎样算做完：真机点击闹钟会出现微信授权弹窗，点允许后提示已开启。
 
@@ -45,15 +45,23 @@
 
 目录：`apps/miniprogram/cloudfunctions/remind/`。源码改完跑 `npm run build:cloud`，打包脚本会把 `occurrencesOnDate` 打进 `remind/index.js`。
 
-`config.json` 里加定时触发器，每 5 分钟一次。微信的 cron 是 7 段：秒 分 时 日 月 周 年。
+`config.json` 里加定时触发器，每 5 分钟一次。微信的 cron 是 7 段：秒 分 时 日 月 周 年。`permissions.openapi` 必须声明，否则云函数调微信接口会被拒（报 `-604101`），订阅能成功但永远收不到消息。
 
 ```json
 {
+  "permissions": {
+    "openapi": [
+      "subscribeMessage.send",
+      "subscribeMessage.getTemplateList"
+    ]
+  },
   "triggers": [
     { "name": "tick", "type": "timer", "config": "0 */5 * * * * *" }
   ]
 }
 ```
+
+`api` 云函数也要有 `config.json`，至少声明 `subscribeMessage.getTemplateList`，否则订阅时读不到后台模板，存进去的模板 ID 是空的。
 
 部署：在微信开发者工具里对 `remind` 选「上传并部署：云端安装依赖」，并确认触发器状态是启用。开发、正式两个环境各部署一次。
 

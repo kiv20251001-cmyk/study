@@ -57,6 +57,14 @@ const look = computed(() => {
       width: `${reveal.value}px`,
       transition: dragging.value ? 'none' : 'width .32s cubic-bezier(.32,.72,0,1)',
     },
+    drawer: {
+      background: dark
+        ? `linear-gradient(135deg, ${mix(tint, '#1c2230', 0.28)} 0%, ${deepTone(tint)} 100%)`
+        : `linear-gradient(135deg, ${mix(tint, '#ffffff', 0.12)} 0%, ${deepTone(tint)} 100%)`,
+      boxShadow: dark
+        ? '-8px 0 20px rgba(0, 0, 0, 0.55)'
+        : `-8px 0 20px ${mix(tint, '#191f3a', 0.45)}`,
+    },
     tile: {
       background: tileBackground(tint),
       boxShadow: dark
@@ -162,12 +170,12 @@ function tapCard() {
       </view>
     </view>
     <view v-if="!readonly" class="hw-clip" :style="look.clip">
-      <view class="hw-drawer">
+      <view class="hw-drawer" :style="look.drawer">
         <button hover-class="press-on" hover-stay-time="80" class="hw-action edit" @click.stop="emit('edit')">
           <AppIcon name="edit" tone="white" :size="16" />
           <text>编辑</text>
         </button>
-        <button hover-class="press-on" hover-stay-time="80" class="hw-action toggle" :class="{ undo: homework.done }" @click.stop="emit('toggle')">
+        <button hover-class="press-on" hover-stay-time="80" class="hw-action toggle" :class="{ undo2: homework.done }" @click.stop="emit('toggle')">
           <AppIcon :name="homework.done ? 'undo' : 'check'" tone="white" :size="16" />
           <text>{{ homework.done ? '未完成' : '完成' }}</text>
         </button>
@@ -190,6 +198,7 @@ function tapCard() {
   right: 0;
   bottom: 0;
   overflow: hidden;
+  border-radius: 0 22px 22px 0;
 }
 .hw-drawer {
   position: absolute;
@@ -202,7 +211,7 @@ function tapCard() {
   align-items: stretch;
   gap: 8px;
   padding: 8px 8px 8px 10px;
-  background: linear-gradient(90deg, rgba(16, 18, 28, 0) 0%, rgba(16, 18, 28, 0.08) 18px, rgba(16, 18, 28, 0.08) 100%);
+  border-radius: 0 22px 22px 0;
 }
 .hw-action {
   display: flex;
@@ -220,9 +229,18 @@ function tapCard() {
   line-height: 1;
 }
 .hw-action::after { border: 0; }
-.hw-action.edit { background: #8a93a8; }
-.hw-action.toggle { background: #2fb57c; }
-.hw-action.toggle.undo { background: #f0a43a; }
+.hw-action.edit {
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.hw-action.toggle {
+  background: #2fb57c;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.hw-action.toggle.undo2 {
+  background: #f0a43a;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
 .hw-card {
   position: relative;
   z-index: 1;

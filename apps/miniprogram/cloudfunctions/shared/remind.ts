@@ -107,6 +107,7 @@ async function fetchTemplateList() {
     openapi: Record<string, Record<string, (data?: object) => Promise<unknown>>>
   }
   const attempts = [
+    () => api.openapi.subscribeMessage.getTemplateList({}),
     () => api.openapi.wxaapi.newtmpl.gettemplate({}),
     () => api.openapi.newtmpl.gettemplate({}),
     () => api.openapi.subscribeMessage.getTemplate({}),
