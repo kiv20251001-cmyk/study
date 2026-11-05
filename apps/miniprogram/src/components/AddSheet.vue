@@ -131,6 +131,10 @@ function pickDates(next: string[]) {
   dates.value = added.length ? [added[added.length - 1]] : next.slice(-1)
 }
 
+function onContentInput(event: { detail?: { value?: string } }) {
+  content.value = String(event.detail?.value ?? '')
+}
+
 function pasteContent() {
   uni.getClipboardData({
     success: (res) => {
@@ -168,6 +172,8 @@ function removeHomework() {
 }
 
 async function submitHomework() {
+  // 微信里点底部按钮时，多行输入框可能还没把最后一次输入交出来。
+  await new Promise((resolve) => setTimeout(resolve, 40))
   const cleanSubject = cleanText(subject.value, TEXT_LIMIT.homeworkSubject)
   const cleanContent = content.value.replace(/\r\n?/g, '\n').trim().slice(0, TEXT_LIMIT.homeworkContent)
   if (!sortedDates.value.length) {
@@ -184,8 +190,9 @@ async function submitHomework() {
   }
   saving.value = true
   try {
+    const existingId = editingHomework.value?.id
     await store.saveHomework({
-      id: editingHomework.value?.id,
+      ...(existingId ? { id: existingId } : {}),
       date: sortedDates.value[0],
       subject: cleanSubject,
       content: cleanContent,
@@ -334,21 +341,24 @@ async function submit() {
               <text class="field-label">作业内容<text class="req">*</text></text>
               <text class="paste press" hover-class="press-on" hover-stay-time="80" @click="pasteContent">粘贴群消息</text>
             </view>
-            <textarea
-              v-model="content"
-              class="homework-content"
-              :maxlength="TEXT_LIMIT.homeworkContent"
-              placeholder="输入或粘贴作业具体内容"
-              placeholder-class="ph"
-              :show-confirm-bar="false"
-              :disable-default-padding="true"
-            />
+            <view class="homework-box">
+              <textarea
+                :value="content"
+                class="homework-content"
+                :maxlength="TEXT_LIMIT.homeworkContent"
+                placeholder="输入或粘贴作业具体内容"
+                placeholder-class="ph"
+                :show-confirm-bar="false"
+                :disable-default-padding="true"
+                @input="onContentInput"
+                @blur="onContentInput"
+              />
+            </view>
           </view>
           <view class="field">
             <text class="field-label">备注</text>
             <input v-model="homeworkNote" :maxlength="TEXT_LIMIT.note" placeholder="例如 周五前交、需要家长签字" placeholder-class="ph" />
           </view>
-          <button v-if="editingHomework" hover-class="press-on" hover-stay-time="80" class="btn danger-text" :disabled="saving" @click="removeHomework">删除这条作业</button>
         </template>
 
         <template v-else-if="mode === 'preset'">
@@ -411,7 +421,15 @@ async function submit() {
         </template>
       </scroll-view>
 
-      <view class="sheet-foot">
+      <view class="sheet-foot" :class="{ 'with-delete': editingHomework && mode === 'homework' }">
+        <button
+          v-if="editingHomework && mode === 'homework'"
+          hover-class="press-on"
+          hover-stay-time="80"
+          class="btn ghost block delete-btn"
+          :disabled="saving"
+          @click="removeHomework"
+        >删除这条作业</button>
         <button hover-class="press-on" hover-stay-time="80" class="btn block" :disabled="saving" @click="submit">{{ saving ? '保存中…' : '确认' }}</button>
       </view>
     </view>
@@ -499,26 +517,39 @@ async function submit() {
 .subject-pick.on { color: #fff; background: #6c63ff; }
 .field-label-row { display: flex; align-items: center; justify-content: space-between; }
 .paste { color: var(--accent-text); font-size: 12px; font-weight: 700; }
-.homework-content {
+.homework-box {
   box-sizing: border-box;
   width: 100%;
-  height: 132px;
-  padding: 11px 12px;
+  padding: 10px 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  color: var(--ink);
   background: var(--field-bg);
-  box-shadow: inset 0 1px 0 var(--line);
+}
+.homework-content {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 112px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: transparent;
+  box-shadow: none;
   font-size: 14px;
   line-height: 1.55;
 }
-.btn.danger-text {
-  width: 100%;
-  height: 42px;
-  margin: 4px 0 8px;
+.with-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.delete-btn {
   color: #e5484d;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 700;
+  background: var(--danger-soft);
+  box-shadow: none;
 }
 .mode-tab {
   position: relative;

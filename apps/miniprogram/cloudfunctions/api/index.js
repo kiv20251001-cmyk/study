@@ -2453,6 +2453,7 @@ async function subscribeReminder(user, payload) {
   const startTime = occurrence.course.recurrence.startTime;
   const minutes = minutesUntil(date, startTime);
   if (minutes < 1) throw new FamilyActionError("ALREADY_STARTED", "\u8FD9\u8282\u8BFE\u5DF2\u7ECF\u5F00\u59CB\u4E86");
+  const template = await resolveRemindTemplate().catch(() => null);
   await reminders().doc(reminderId(user.openid, courseId, date)).set({
     data: {
       openid: user.openid,
@@ -2460,6 +2461,8 @@ async function subscribeReminder(user, payload) {
       courseId,
       date,
       envVersion: envVersion === "develop" || envVersion === "trial" ? envVersion : "release",
+      templateId: (template == null ? void 0 : template.id) || "",
+      fields: (template == null ? void 0 : template.fields) || null,
       status: "pending",
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     }

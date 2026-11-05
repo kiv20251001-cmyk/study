@@ -4,9 +4,7 @@ import { tickReminders } from '../../shared/remind'
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 export async function main(event: { Type?: string; TriggerName?: string }) {
-  if (event?.Type !== 'timer' && !event?.TriggerName) {
-    return { ok: false, message: 'remind 只由定时触发器调用' }
-  }
+  console.log('[remind] invoke', event?.Type || 'manual', event?.TriggerName || '')
   try {
     return { ok: true, ...(await tickReminders()) }
   } catch (error) {

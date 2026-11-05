@@ -6,11 +6,11 @@ import type { AppSnapshot } from '../../../../server/src/domain/types'
 import { occurrencesOnDate } from '../../../../server/src/domain/schedule'
 import { FamilyActionError } from '../../../../server/src/workspace/family-actions'
 import {
-  clipThing,
   parseTemplateContent,
   REMIND_TEMPLATE_FIELDS,
   REMIND_TEMPLATE_ID,
-  remindTimeText,
+  remindFieldValue,
+  type RemindFields,
   type RemindTemplate,
 } from '../../src/domain/remind'
 
@@ -29,6 +29,8 @@ export interface ReminderRow {
   courseId: string
   date: string
   envVersion?: string
+  templateId?: string
+  fields?: RemindFields
   status: 'pending' | 'sent' | 'skipped' | 'noquota'
 }
 
@@ -177,6 +179,7 @@ export async function subscribeReminder(
   const startTime = occurrence.course.recurrence.startTime
   const minutes = minutesUntil(date, startTime)
   if (minutes < 1) throw new FamilyActionError('ALREADY_STARTED', '这节课已经开始了')
+  const template = await resolveRemindTemplate().catch(() => null)
   await reminders().doc(reminderId(user.openid, courseId, date)).set({
     data: {
       openid: user.openid,
@@ -184,6 +187,8 @@ export async function subscribeReminder(
       courseId,
       date,
       envVersion: envVersion === 'develop' || envVersion === 'trial' ? envVersion : 'release',
+      templateId: template?.id || '',
+      fields: template?.fields || null,
       status: 'pending',
       createdAt: new Date().toISOString(),
     },
@@ -191,12 +196,25 @@ export async function subscribeReminder(
   return { late: minutes < 15 }
 }
 
+function rowDocId(row: ReminderRow) {
+  return row._id || reminderId(row.openid, row.courseId, row.date)
+}
+
+function templateOf(row: ReminderRow, fallback: RemindTemplate | null) {
+  if (row.templateId && row.fields?.title && row.fields.time && row.fields.location && row.fields.note) {
+    return { id: row.templateId, fields: row.fields }
+  }
+  return fallback
+}
+
 async function sendOne(template: RemindTemplate, row: ReminderRow, title: string, startTime: string, location: string, note: string) {
+  const value = (key: string, plain: string, fallback: string) =>
+    remindFieldValue(key, plain, fallback, row.date, startTime)
   const data: Record<string, { value: string }> = {
-    [template.fields.title]: { value: clipThing(title, '课程') },
-    [template.fields.time]: { value: clipThing(remindTimeText(row.date, startTime), startTime) },
-    [template.fields.location]: { value: clipThing(location, '地点待定') },
-    [template.fields.note]: { value: clipThing(note, '无') },
+    [template.fields.title]: { value: value(template.fields.title, title, '课程') },
+    [template.fields.time]: { value: value(template.fields.time, startTime, startTime) },
+    [template.fields.location]: { value: value(template.fields.location, location, '地点待定') },
+    [template.fields.note]: { value: value(template.fields.note, note, '无') },
   }
   const api = cloud as unknown as {
     openapi: { subscribeMessage: { send: (input: Record<string, unknown>) => Promise<unknown> } }
@@ -211,10 +229,16 @@ async function sendOne(template: RemindTemplate, row: ReminderRow, title: string
   })
 }
 
-/** 每 5 分钟跑一次。课前 1–18 分钟内发送，正常会落在提前约 15 分钟。 */
+/** 每 5 分钟跑一次。只在上课前 1–18 分钟内发送，正常会落在提前约 15 分钟。 */
 export async function tickReminders() {
   await ensureReminders()
-  const template = await resolveRemindTemplate()
+  let fallback: RemindTemplate | null = null
+  try {
+    fallback = await resolveRemindTemplate()
+    console.log('[remind] template', fallback.id, fallback.fields)
+  } catch (error) {
+    console.error('[remind] template', error instanceof Error ? error.message : errorText(error))
+  }
   const today = shanghaiNow().format('YYYY-MM-DD')
   const found = await reminders().where({ status: 'pending' }).limit(100).get()
   const rows = (found.data || []) as ReminderRow[]
@@ -222,8 +246,7 @@ export async function tickReminders() {
   let sent = 0
   let skipped = 0
   for (const row of rows) {
-    const id = row._id
-    if (!id) continue
+    const id = rowDocId(row)
     if (row.date < today) {
       await reminders().doc(id).update({ data: { status: 'skipped', updatedAt: new Date().toISOString() } })
       skipped += 1
@@ -243,10 +266,19 @@ export async function tickReminders() {
     }
     const startTime = occurrence.course.recurrence.startTime
     const minutes = minutesUntil(row.date, startTime)
-    if (minutes > 18) continue
+    if (minutes > 18) {
+      console.log('[remind] wait', row.courseId, startTime, `in ${minutes}m`)
+      continue
+    }
     if (minutes < 1) {
       await reminders().doc(id).update({ data: { status: 'skipped', updatedAt: new Date().toISOString() } })
       skipped += 1
+      console.log('[remind] skipped late', row.courseId, startTime, minutes)
+      continue
+    }
+    const template = templateOf(row, fallback)
+    if (!template) {
+      console.error('[remind] no template', row.courseId)
       continue
     }
     try {

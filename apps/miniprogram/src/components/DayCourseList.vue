@@ -408,7 +408,7 @@ const rows = computed(() => {
         <view class="homework-dot" />
         <text class="homework-title">课堂作业</text>
         <text class="homework-count">{{ homeworkDone }}/{{ homeworkRows.length }} 已完成</text>
-        <text v-if="!readonly" class="homework-hint">左滑可编辑、完成</text>
+        <text v-if="!readonly" class="homework-hint">左滑卡片可更改状态</text>
       </view>
       <HomeworkCard
         v-for="item in homeworkRows"
@@ -703,7 +703,7 @@ const rows = computed(() => {
 .progress-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .progress-track { height: 5px; border-radius: 999px; overflow: hidden; }
 .progress-track view { height: 100%; border-radius: 999px; }
-.homework-block { margin-top: 6px; }
+.homework-block { margin-top: 6px; overflow: hidden; }
 .lesson-list + .homework-block { margin-top: 18px; }
 .homework-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding-left: 2px; }
 .homework-dot { width: 7px; height: 7px; border-radius: 50%; background: #6c63ff; box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.18); }

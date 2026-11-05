@@ -1,7 +1,13 @@
-/** 微信「我的模板」的模板 ID。留空时由云函数读取小程序后台已经选用的模板。 */
+/**
+ * 课前提醒模板的唯一配置。小程序和两个云函数都从这里读。
+ * `cloudfunctions/api/index.js`、`cloudfunctions/remind/index.js` 是打包进去的副本，不要手改。
+ * 改完后在 `apps/miniprogram` 执行 `npm run build:cloud`，再重新上传 `api` 和 `remind`。
+ *
+ * 微信发送接口的键名不带 `.DATA`。后台模板写 `{{thing3.DATA}}`，这里填 `thing3`。
+ */
 export const REMIND_TEMPLATE_ID = ''
 
-/** 与后台字段顺序一致：计划名称、开始时间、地点、备注。后台若不是 thing1–4，留空模板 ID，让云函数按字段名识别。 */
+/** 计划名称、开始时间、地点、备注。留空模板 ID 时，云函数改为按后台模板正文识别这些键。 */
 export const REMIND_TEMPLATE_FIELDS = {
   title: 'thing1',
   time: 'thing2',
@@ -38,6 +44,19 @@ export function clipThing(value: string, fallback: string) {
 export function remindTimeText(date: string, startTime: string) {
   const [, month, day] = date.split('-')
   return `${Number(month)}月${Number(day)}日 ${startTime}`
+}
+
+/**
+ * 按字段类型整理发送内容。
+ * thing 用原文截断；time、date 必须是「2019年10月1日 15:01」，否则微信返回 47003，消息发不出去。
+ */
+export function remindFieldValue(key: string, plain: string, fallback: string, date = '', startTime = '') {
+  const kind = key.replace(/\d+$/, '')
+  if ((kind === 'time' || kind === 'date') && /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(startTime)) {
+    const [year, month, day] = date.split('-')
+    return `${year}年${Number(month)}月${Number(day)}日 ${startTime}`
+  }
+  return clipThing(plain, fallback)
 }
 
 /** 从模板 content「计划名称:{{thing1.DATA}}」里认出四个字段的键名。 */

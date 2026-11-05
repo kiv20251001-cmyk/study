@@ -591,9 +591,13 @@ function clipThing(value, fallback) {
   const clipped = text.slice(0, 20).join("").trim();
   return clipped || fallback;
 }
-function remindTimeText(date, startTime) {
-  const [, month, day] = date.split("-");
-  return `${Number(month)}\u6708${Number(day)}\u65E5 ${startTime}`;
+function remindFieldValue(key, plain, fallback, date = "", startTime = "") {
+  const kind = key.replace(/\d+$/, "");
+  if ((kind === "time" || kind === "date") && /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(startTime)) {
+    const [year, month, day] = date.split("-");
+    return `${year}\u5E74${Number(month)}\u6708${Number(day)}\u65E5 ${startTime}`;
+  }
+  return clipThing(plain, fallback);
 }
 function parseTemplateContent(content) {
   const matches = [...content.matchAll(/([^:\n{：]+)[:：]\{\{(\w+)\.(?:DATA|data)\}\}/g)];
@@ -642,6 +646,9 @@ function shanghaiNow() {
 function minutesUntil(date, startTime) {
   const start = import_dayjs3.default.tz(`${date} ${startTime}`, "YYYY-MM-DD HH:mm", "Asia/Shanghai");
   return start.diff((0, import_dayjs3.default)(), "minute");
+}
+function reminderId(openid, courseId, date) {
+  return `${openid}_${courseId}_${date}`.replace(/[^\w-]/g, "").slice(0, 200);
 }
 function mpState(envVersion) {
   if (envVersion === "develop") return "developer";
@@ -711,12 +718,23 @@ async function resolveRemindTemplate() {
   }
   throw new FamilyActionError("TEMPLATE_MISSING", "\u8FD8\u6CA1\u6709\u53EF\u7528\u7684\u8BFE\u524D\u63D0\u9192\u6A21\u677F");
 }
+function rowDocId(row) {
+  return row._id || reminderId(row.openid, row.courseId, row.date);
+}
+function templateOf(row, fallback) {
+  var _a;
+  if (row.templateId && ((_a = row.fields) == null ? void 0 : _a.title) && row.fields.time && row.fields.location && row.fields.note) {
+    return { id: row.templateId, fields: row.fields };
+  }
+  return fallback;
+}
 async function sendOne(template, row, title, startTime, location, note) {
+  const value = (key, plain, fallback) => remindFieldValue(key, plain, fallback, row.date, startTime);
   const data = {
-    [template.fields.title]: { value: clipThing(title, "\u8BFE\u7A0B") },
-    [template.fields.time]: { value: clipThing(remindTimeText(row.date, startTime), startTime) },
-    [template.fields.location]: { value: clipThing(location, "\u5730\u70B9\u5F85\u5B9A") },
-    [template.fields.note]: { value: clipThing(note, "\u65E0") }
+    [template.fields.title]: { value: value(template.fields.title, title, "\u8BFE\u7A0B") },
+    [template.fields.time]: { value: value(template.fields.time, startTime, startTime) },
+    [template.fields.location]: { value: value(template.fields.location, location, "\u5730\u70B9\u5F85\u5B9A") },
+    [template.fields.note]: { value: value(template.fields.note, note, "\u65E0") }
   };
   const api = import_wx_server_sdk.default;
   await api.openapi.subscribeMessage.send({
@@ -730,7 +748,13 @@ async function sendOne(template, row, title, startTime, location, note) {
 }
 async function tickReminders() {
   await ensureReminders();
-  const template = await resolveRemindTemplate();
+  let fallback = null;
+  try {
+    fallback = await resolveRemindTemplate();
+    console.log("[remind] template", fallback.id, fallback.fields);
+  } catch (error) {
+    console.error("[remind] template", error instanceof Error ? error.message : errorText(error));
+  }
   const today = shanghaiNow().format("YYYY-MM-DD");
   const found = await reminders().where({ status: "pending" }).limit(100).get();
   const rows = found.data || [];
@@ -738,8 +762,7 @@ async function tickReminders() {
   let sent = 0;
   let skipped = 0;
   for (const row of rows) {
-    const id = row._id;
-    if (!id) continue;
+    const id = rowDocId(row);
     if (row.date < today) {
       await reminders().doc(id).update({ data: { status: "skipped", updatedAt: (/* @__PURE__ */ new Date()).toISOString() } });
       skipped += 1;
@@ -759,10 +782,19 @@ async function tickReminders() {
     }
     const startTime = occurrence.course.recurrence.startTime;
     const minutes = minutesUntil(row.date, startTime);
-    if (minutes > 18) continue;
+    if (minutes > 18) {
+      console.log("[remind] wait", row.courseId, startTime, `in ${minutes}m`);
+      continue;
+    }
     if (minutes < 1) {
       await reminders().doc(id).update({ data: { status: "skipped", updatedAt: (/* @__PURE__ */ new Date()).toISOString() } });
       skipped += 1;
+      console.log("[remind] skipped late", row.courseId, startTime, minutes);
+      continue;
+    }
+    const template = templateOf(row, fallback);
+    if (!template) {
+      console.error("[remind] no template", row.courseId);
       continue;
     }
     try {
@@ -791,9 +823,7 @@ async function tickReminders() {
 // cloudfunctions/remind/src/index.ts
 import_wx_server_sdk2.default.init({ env: import_wx_server_sdk2.default.DYNAMIC_CURRENT_ENV });
 async function main(event) {
-  if ((event == null ? void 0 : event.Type) !== "timer" && !(event == null ? void 0 : event.TriggerName)) {
-    return { ok: false, message: "remind \u53EA\u7531\u5B9A\u65F6\u89E6\u53D1\u5668\u8C03\u7528" };
-  }
+  console.log("[remind] invoke", (event == null ? void 0 : event.Type) || "manual", (event == null ? void 0 : event.TriggerName) || "");
   try {
     return { ok: true, ...await tickReminders() };
   } catch (error) {

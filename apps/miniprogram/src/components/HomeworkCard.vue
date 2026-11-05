@@ -38,8 +38,10 @@ let startY = 0
 let base = 0
 let direction: '' | 'x' | 'y' = ''
 
-const offset = computed(() => (dragging.value ? dragOffset.value : props.opened ? -ACTION_WIDTH : 0))
+/** 右侧盖上来的宽度。0 是收起，ACTION_WIDTH 是完全盖住。 */
+const reveal = computed(() => (dragging.value ? dragOffset.value : props.opened ? ACTION_WIDTH : 0))
 const long = computed(() => props.homework.content.length > 60 || props.homework.content.split('\n').length > 3)
+let moved = false
 
 const look = computed(() => {
   const tint = props.homework.done ? HOMEWORK_DONE_COLOR : HOMEWORK_COLOR
@@ -50,8 +52,10 @@ const look = computed(() => {
       boxShadow: dark
         ? `0 2px 6px rgba(0,0,0,.28), 0 18px 34px -18px rgba(0,0,0,.6), inset 0 1px 0 ${mix(tint, '#1c2230', 0.78)}`
         : `0 2px 5px rgba(25,31,58,.04), 0 18px 34px -16px ${mix(tint, '#191f3a', 0.58)}, inset 0 1px 0 rgba(255,255,255,.9)`,
-      transform: `translateX(${offset.value}px)`,
-      transition: dragging.value ? 'none' : 'transform .32s cubic-bezier(.32,.72,0,1)',
+    },
+    clip: {
+      width: `${reveal.value}px`,
+      transition: dragging.value ? 'none' : 'width .32s cubic-bezier(.32,.72,0,1)',
     },
     tile: {
       background: tileBackground(tint),
@@ -67,14 +71,20 @@ const status = computed(() => {
   if (props.missed) return { text: '未完成', cls: 'missed' }
   return { text: '待完成', cls: 'pending' }
 })
+const seal = computed(() => {
+  if (props.homework.done) return { text: '已完成', cls: 'done' }
+  if (props.missed) return { text: '未完成', cls: 'missed' }
+  return null
+})
 
 function touchStart(event: TouchEvent) {
   if (props.readonly) return
   const point = event.touches[0]
   startX = point.clientX
   startY = point.clientY
-  base = props.opened ? -ACTION_WIDTH : 0
+  base = props.opened ? ACTION_WIDTH : 0
   direction = ''
+  moved = false
 }
 
 function touchMove(event: TouchEvent) {
@@ -87,13 +97,14 @@ function touchMove(event: TouchEvent) {
     direction = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
   }
   if (direction !== 'x') return
+  moved = true
   dragging.value = true
-  dragOffset.value = Math.min(0, Math.max(-ACTION_WIDTH - 16, base + dx))
+  dragOffset.value = Math.min(ACTION_WIDTH, Math.max(0, base - dx))
 }
 
 function touchEnd() {
   if (!dragging.value) return
-  const open = dragOffset.value < -ACTION_WIDTH / 2
+  const open = dragOffset.value > ACTION_WIDTH / 2
   dragging.value = false
   direction = ''
   if (open) emit('open')
@@ -101,6 +112,7 @@ function touchEnd() {
 }
 
 function tapCard() {
+  if (moved) return
   if (props.opened) {
     emit('close')
     return
@@ -110,37 +122,32 @@ function tapCard() {
 </script>
 
 <template>
-  <view class="hw" :class="{ readonly }">
-    <view v-if="!readonly" class="hw-actions">
-      <button hover-class="press-on" hover-stay-time="80" class="hw-action edit" @click="emit('edit')">
-        <AppIcon name="edit" tone="white" :size="16" />
-        <text>编辑</text>
-      </button>
-      <button hover-class="press-on" hover-stay-time="80" class="hw-action toggle" :class="{ undo: homework.done }" @click="emit('toggle')">
-        <AppIcon :name="homework.done ? 'undo' : 'check'" tone="white" :size="16" />
-        <text>{{ homework.done ? '未完成' : '完成' }}</text>
-      </button>
-    </view>
+  <view
+    class="hw"
+    :class="{ readonly }"
+    @touchstart="touchStart"
+    @touchmove="touchMove"
+    @touchend="touchEnd"
+    @touchcancel="touchEnd"
+    @click="tapCard"
+  >
     <view
       class="hw-card"
-      :class="{ done: homework.done }"
+      :class="{ done: homework.done, cue: !readonly }"
       :style="look.card"
-      @touchstart="touchStart"
-      @touchmove="touchMove"
-      @touchend="touchEnd"
-      @touchcancel="touchEnd"
-      @click="tapCard"
     >
+      <view v-if="seal" class="hw-seal" :class="seal.cls">
+        <view class="hw-seal-ring">
+          <view class="hw-seal-inner"><text>{{ seal.text }}</text></view>
+        </view>
+      </view>
       <view class="hw-tile" :style="look.tile">
         <AppIcon name="homework" tone="white" :size="24" />
-        <view v-if="homework.done" class="hw-tile-check">
-          <AppIcon name="check" tone="white" :size="10" />
-        </view>
       </view>
       <view class="hw-copy">
         <view class="hw-top">
           <text class="hw-subject">{{ homework.subject }}</text>
-          <text class="hw-status" :class="status.cls">{{ status.text }}</text>
+          <text v-if="!seal" class="hw-status" :class="status.cls">{{ status.text }}</text>
         </view>
         <text class="hw-content" :class="{ clamp: !expanded }">{{ homework.content }}</text>
         <text v-if="long" class="hw-more">{{ expanded ? '收起' : '展开全部' }}</text>
@@ -148,6 +155,22 @@ function tapCard() {
           <text class="hw-note-label">备注</text>
           <text class="hw-note-text">{{ homework.note }}</text>
         </view>
+      </view>
+      <view v-if="!readonly && !opened" class="hw-cue">
+        <AppIcon name="chevron-left" tone="muted" :size="12" />
+        <text>左滑</text>
+      </view>
+    </view>
+    <view v-if="!readonly" class="hw-clip" :style="look.clip">
+      <view class="hw-drawer">
+        <button hover-class="press-on" hover-stay-time="80" class="hw-action edit" @click.stop="emit('edit')">
+          <AppIcon name="edit" tone="white" :size="16" />
+          <text>编辑</text>
+        </button>
+        <button hover-class="press-on" hover-stay-time="80" class="hw-action toggle" :class="{ undo: homework.done }" @click.stop="emit('toggle')">
+          <AppIcon :name="homework.done ? 'undo' : 'check'" tone="white" :size="16" />
+          <text>{{ homework.done ? '未完成' : '完成' }}</text>
+        </button>
       </view>
     </view>
   </view>
@@ -160,17 +183,26 @@ function tapCard() {
   overflow: hidden;
   border-radius: 22px;
 }
-.hw-actions {
+.hw-clip {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+.hw-drawer {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   display: flex;
   width: 144px;
-  gap: 8px;
-  padding: 0 0 0 16px;
   box-sizing: border-box;
   align-items: stretch;
+  gap: 8px;
+  padding: 8px 8px 8px 10px;
+  background: linear-gradient(90deg, rgba(16, 18, 28, 0) 0%, rgba(16, 18, 28, 0.08) 18px, rgba(16, 18, 28, 0.08) 100%);
 }
 .hw-action {
   display: flex;
@@ -202,6 +234,7 @@ function tapCard() {
 }
 .hw-tile {
   position: relative;
+  z-index: 1;
   display: flex;
   width: 48px;
   height: 48px;
@@ -210,20 +243,62 @@ function tapCard() {
   justify-content: center;
   border-radius: 16px;
 }
-.hw-tile-check {
+.hw-card.cue { padding-right: 52px; }
+.hw-cue {
   position: absolute;
-  right: -4px;
-  bottom: -4px;
+  z-index: 2;
+  top: 16px;
+  right: 10px;
   display: flex;
-  width: 18px;
-  height: 18px;
+  align-items: center;
+  gap: 1px;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+.hw-seal {
+  position: absolute;
+  z-index: 0;
+  right: -18px;
+  bottom: 8px;
+  display: flex;
+  width: 84px;
+  height: 84px;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-  background: #2fb57c;
+  opacity: 0.32;
+  transform: rotate(-16deg);
+  pointer-events: none;
 }
-.hw-copy { min-width: 0; flex: 1; }
+.hw-seal.done { color: var(--paid); }
+.hw-seal.missed { color: #e5484d; }
+.hw-seal-ring {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+.hw-seal-inner {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+.hw-seal-inner text {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  transform: translate(-6px, -4px);
+}
+.hw-copy { position: relative; z-index: 1; min-width: 0; flex: 1; }
 .hw-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hw-subject {
   min-width: 0;

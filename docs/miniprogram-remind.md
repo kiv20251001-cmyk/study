@@ -35,7 +35,7 @@
 
 点一下调用 `uni.requestSubscribeMessage`。一次调用里同一个模板 ID 只能出现一次，所以点一次、允许一次，只给这一节课增加 1 次额度。已经开过的课再点，只提示「这节课会在课前提醒你」，不再弹授权。拒绝时提示「还没开启提醒」，下次仍要点这个闹钟才会再问。
 
-模板 ID 默认由云函数读取小程序后台已选用的模板，并按「计划名称、开始时间、地点、备注」对上 `{{thingxx.DATA}}` 的键名。后台如果有多套模板对不上，把模板 ID 填进 `apps/miniprogram/src/domain/remind.ts` 的 `REMIND_TEMPLATE_ID`，字段键名改 `REMIND_TEMPLATE_FIELDS`。
+模板只维护 `apps/miniprogram/src/domain/remind.ts`。`cloudfunctions/api/index.js` 和 `cloudfunctions/remind/index.js` 里的同名常量是打包副本，手改会被下次打包覆盖。后台模板写 `{{thing3.DATA}}` 时，配置里填 `thing3`，不要带 `.DATA`。留空模板 ID 时，云函数按模板正文识别键名。改完执行 `npm run build:cloud`，再上传 `api` 和 `remind`。
 
 怎样算做完：真机点击闹钟会出现微信授权弹窗，点允许后提示已开启。
 
@@ -65,7 +65,7 @@
 
 1. 只读 `reminders` 里状态为 `pending` 的记录。每条是某一个用户为某一节课点过允许。
 2. 用这节课所在家庭的 `snapshotJson`，经 `occurrencesOnDate` 核对课还在，开始时间以临时调整后的为准。已取消或已开始则标成 `skipped`。
-3. 开始时间落在现在之后 1 到 18 分钟里才发。每 5 分钟扫一次，通常会落在提前约 15 分钟；上一拍没扫到时，仍赶在上课前发出。
+3. 开始时间落在现在之后 1 到 18 分钟里才发，也就是大约上课前 15 分钟。每 5 分钟扫一次。上课时间到了还没发出，就标成 `skipped`，不再补发。不是上课那一刻才推。
 4. 只发给点过这节课闹钟的那个 openid。调用：
 
 ```js
@@ -76,10 +76,10 @@ cloud.openapi.subscribeMessage.send({
   miniprogramState: 'formal',
   lang: 'zh_CN',
   data: {
-    // 键名必须和选用模板的字段一致，例如：
-    // thing1: { value: 课程名，最多约 20 字，超了要截断 },
-    // time2: { value: '2026-10-12 15:00' },
-    // thing3: { value: 地点或「地点待定」 },
+    // 键名不带 .DATA。模板里的 {{thing3.DATA}} 这里写 thing3。
+    // thing3: { value: 课程名，最多约 20 字 },
+    // time2: { value: '2026年10月12日 15:00' },
+    // thing4: { value: 地点或「地点待定」 },
   },
 })
 ```
