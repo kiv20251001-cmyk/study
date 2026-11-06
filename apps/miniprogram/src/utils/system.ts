@@ -16,6 +16,14 @@ export function statusBarHeight() {
   return readInfo().statusBar
 }
 
+/** 品牌栏内容区高度，不含状态栏。和 .app-brand-inner 的 min-height 一致。 */
+export const BRAND_BAR_HEIGHT = 72
+
+/** 首页和账单页顶部 logo 栏占掉的高度，含状态栏。 */
+export function brandHeaderHeight() {
+  return statusBarHeight() + BRAND_BAR_HEIGHT
+}
+
 export function windowWidth() {
   return readInfo().windowWidth
 }

@@ -230,8 +230,17 @@ async function sendOne(template: RemindTemplate, row: ReminderRow, title: string
   })
 }
 
-/** 每 5 分钟跑一次。只在上课前 1–18 分钟内发送，正常会落在提前约 15 分钟。 */
-export async function tickReminders() {
+function skip(id: string, reason: string) {
+  return reminders().doc(id).update({
+    data: { status: 'skipped', skipReason: reason, updatedAt: new Date().toISOString() },
+  })
+}
+
+/**
+ * 每 5 分钟跑一次。只在上课前 1–18 分钟内发送，正常会落在提前约 15 分钟。
+ * `force` 只给云端测试用：今天还没开始的课立刻发，不等 15 分钟窗口，会用掉那次额度。
+ */
+export async function tickReminders(options: { force?: boolean } = {}) {
   await ensureReminders()
   let fallback: RemindTemplate | null = null
   try {
@@ -244,16 +253,23 @@ export async function tickReminders() {
   const found = await reminders().where({ status: 'pending' }).limit(100).get()
   const rows = (found.data || []) as ReminderRow[]
   const families = new Map<string, AppSnapshot | null>()
+  const report: Array<Record<string, unknown>> = []
   let sent = 0
   let skipped = 0
   for (const row of rows) {
     const id = rowDocId(row)
+    const entry: Record<string, unknown> = { id, courseId: row.courseId, date: row.date, envVersion: row.envVersion }
+    report.push(entry)
     if (row.date < today) {
-      await reminders().doc(id).update({ data: { status: 'skipped', updatedAt: new Date().toISOString() } })
+      await skip(id, 'past-date')
       skipped += 1
+      entry.result = 'skipped: 日期已过'
       continue
     }
-    if (row.date > today) continue
+    if (row.date > today) {
+      entry.result = 'wait: 不是今天'
+      continue
+    }
     let snapshot = families.get(row.familyId)
     if (snapshot === undefined) {
       snapshot = await loadSnapshot(row.familyId)
@@ -261,27 +277,36 @@ export async function tickReminders() {
     }
     const occurrence = snapshot ? findOccurrence(snapshot, row.courseId, row.date) : null
     if (!occurrence) {
-      await reminders().doc(id).update({ data: { status: 'skipped', updatedAt: new Date().toISOString() } })
+      await skip(id, 'occurrence-gone')
       skipped += 1
+      entry.result = 'skipped: 课已取消或不存在'
       continue
     }
     const startTime = occurrence.course.recurrence.startTime
     const minutes = minutesUntil(row.date, startTime)
-    if (minutes > 18) {
+    entry.startTime = startTime
+    entry.minutesUntil = minutes
+    if (minutes > 18 && !options.force) {
       console.log('[remind] wait', row.courseId, startTime, `in ${minutes}m`)
+      entry.result = `wait: 还有 ${minutes} 分钟，进入课前 18 分钟后才发`
       continue
     }
     if (minutes < 1) {
-      await reminders().doc(id).update({ data: { status: 'skipped', updatedAt: new Date().toISOString() } })
+      await skip(id, 'started')
       skipped += 1
       console.log('[remind] skipped late', row.courseId, startTime, minutes)
+      entry.result = 'skipped: 已经开课'
       continue
     }
     const template = templateOf(row, fallback)
     if (!template) {
       console.error('[remind] no template', row.courseId)
+      await reminders().doc(id).update({ data: { lastError: 'no template', triedAt: new Date().toISOString() } })
+      entry.result = 'error: 没有模板 ID'
       continue
     }
+    entry.templateId = template.id
+    entry.fields = template.fields
     try {
       await sendOne(
         template,
@@ -293,16 +318,23 @@ export async function tickReminders() {
       )
       await reminders().doc(id).update({ data: { status: 'sent', sentAt: new Date().toISOString() } })
       sent += 1
+      entry.result = 'sent'
     } catch (error) {
       const code = Number((error as { errCode?: number; errcode?: number }).errCode
         ?? (error as { errcode?: number }).errcode
         ?? 0)
-      if (code === 43101) {
-        await reminders().doc(id).update({ data: { status: 'noquota', updatedAt: new Date().toISOString() } })
-      }
-      console.error('[remind] send failed', row.courseId, code || errorText(error))
+      const detail = errorText(error).trim()
+      await reminders().doc(id).update({
+        data: {
+          ...(code === 43101 ? { status: 'noquota' } : {}),
+          lastError: detail,
+          triedAt: new Date().toISOString(),
+        },
+      })
+      console.error('[remind] send failed', row.courseId, detail)
+      entry.result = `error: ${detail}`
     }
   }
   console.log(`[remind] sent=${sent} skipped=${skipped} pending=${rows.length}`)
-  return { sent, skipped }
+  return { sent, skipped, today, template: fallback, rows: report }
 }

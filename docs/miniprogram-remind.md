@@ -63,7 +63,9 @@
 
 `api` 云函数也要有 `config.json`，至少声明 `subscribeMessage.getTemplateList`，否则订阅时读不到后台模板，存进去的模板 ID 是空的。
 
-部署：在微信开发者工具里对 `remind` 选「上传并部署：云端安装依赖」，并确认触发器状态是启用。开发、正式两个环境各部署一次。
+部署：在微信开发者工具里对 `remind` 选「上传并部署：云端安装依赖」。**上传函数不会带上定时触发器**，还要在 `cloudfunctions/remind/config.json` 上右键选「上传触发器」，再到云开发控制台「云函数 → remind → 触发器」确认能看到 `tick`。开发、正式两个环境各部署一次。
+
+只上传了函数、没上传触发器时，订阅会成功，`reminders` 里也有 `pending`，但到点永远不发；过了开课时间记录仍是 `pending`，就是这个原因（定时器跑过的话会把它改成 `skipped`）。
 
 怎样算做完：云函数列表里有 `remind`，触发器为启用，日志里能看到每 5 分钟一次的调用。
 
@@ -119,7 +121,7 @@ cloud.openapi.subscribeMessage.send({
 
 1. 真机打开开发版或体验版，点允许。此时 `miniprogramState` 用 `developer` 或 `trial`。
 2. 建一节开始时间在 15 分钟后的课。
-3. 云开发控制台对 `remind` 选「云端测试」立即跑一次，或等到下一个 5 分钟。
+3. 云开发控制台对 `remind` 选「云端测试」立即跑一次，或等到下一个 5 分钟。参数填 `{ "force": true }` 会不等 15 分钟窗口，立刻试发今天还没开始的课（用掉那次额度）。返回结果的 `rows` 里每条都写了 `sent`、`wait`、`skipped` 或微信退回的错误；失败原因也会写进 `reminders` 那条记录的 `lastError`。
 4. 看云函数日志，再看手机微信的「服务通知」。
 5. 同一节课再触发一次，确认 `reminders` 挡住了重复发送。
 6. 正式版发布前把 `miniprogramState` 改成 `formal`，并部署到正式云环境。

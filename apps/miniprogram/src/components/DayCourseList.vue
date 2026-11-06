@@ -207,7 +207,8 @@ function subscribe(item: DayOccurrence) {
 const homeworkRows = computed(() => (props.date ? homeworkOn(store.homework, props.date) : []))
 const homeworkDone = computed(() => homeworkRows.value.filter((item) => item.done).length)
 const swipedId = ref('')
-const toggling = ref(false)
+/** 同一条作业的上一次切换还没回到云端时，不再连发，避免两个请求先后落地造成状态来回跳。 */
+const toggling = new Set<string>()
 
 function homeworkMissed(item: Homework) {
   return !item.done && item.date < dayjs().format('YYYY-MM-DD')
@@ -223,16 +224,17 @@ function editHomework(item: Homework) {
 }
 
 async function toggleHomework(item: Homework) {
-  if (toggling.value) return
-  toggling.value = true
+  if (toggling.has(item.id)) return
+  const done = !item.done
+  toggling.add(item.id)
   swipedId.value = ''
+  uni.showToast({ icon: 'none', title: done ? '作业已完成' : '已改回未完成' })
   try {
-    await store.setHomeworkDone(item.id, !item.done)
-    uni.showToast({ icon: 'none', title: item.done ? '已改回未完成' : '作业已完成' })
+    await store.setHomeworkDone(item.id, done)
   } catch (error) {
     showCloudError(error)
   } finally {
-    toggling.value = false
+    toggling.delete(item.id)
   }
 }
 

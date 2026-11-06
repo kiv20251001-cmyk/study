@@ -743,7 +743,12 @@ async function sendOne(template, row, title, startTime, location, note) {
     data
   });
 }
-async function tickReminders() {
+function skip(id, reason) {
+  return reminders().doc(id).update({
+    data: { status: "skipped", skipReason: reason, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
+  });
+}
+async function tickReminders(options = {}) {
   await ensureReminders();
   let fallback = null;
   try {
@@ -756,16 +761,23 @@ async function tickReminders() {
   const found = await reminders().where({ status: "pending" }).limit(100).get();
   const rows = found.data || [];
   const families = /* @__PURE__ */ new Map();
+  const report = [];
   let sent = 0;
   let skipped = 0;
   for (const row of rows) {
     const id = rowDocId(row);
+    const entry = { id, courseId: row.courseId, date: row.date, envVersion: row.envVersion };
+    report.push(entry);
     if (row.date < today) {
-      await reminders().doc(id).update({ data: { status: "skipped", updatedAt: (/* @__PURE__ */ new Date()).toISOString() } });
+      await skip(id, "past-date");
       skipped += 1;
+      entry.result = "skipped: \u65E5\u671F\u5DF2\u8FC7";
       continue;
     }
-    if (row.date > today) continue;
+    if (row.date > today) {
+      entry.result = "wait: \u4E0D\u662F\u4ECA\u5929";
+      continue;
+    }
     let snapshot = families.get(row.familyId);
     if (snapshot === void 0) {
       snapshot = await loadSnapshot(row.familyId);
@@ -773,27 +785,36 @@ async function tickReminders() {
     }
     const occurrence = snapshot ? findOccurrence(snapshot, row.courseId, row.date) : null;
     if (!occurrence) {
-      await reminders().doc(id).update({ data: { status: "skipped", updatedAt: (/* @__PURE__ */ new Date()).toISOString() } });
+      await skip(id, "occurrence-gone");
       skipped += 1;
+      entry.result = "skipped: \u8BFE\u5DF2\u53D6\u6D88\u6216\u4E0D\u5B58\u5728";
       continue;
     }
     const startTime = occurrence.course.recurrence.startTime;
     const minutes = minutesUntil(row.date, startTime);
-    if (minutes > 18) {
+    entry.startTime = startTime;
+    entry.minutesUntil = minutes;
+    if (minutes > 18 && !options.force) {
       console.log("[remind] wait", row.courseId, startTime, `in ${minutes}m`);
+      entry.result = `wait: \u8FD8\u6709 ${minutes} \u5206\u949F\uFF0C\u8FDB\u5165\u8BFE\u524D 18 \u5206\u949F\u540E\u624D\u53D1`;
       continue;
     }
     if (minutes < 1) {
-      await reminders().doc(id).update({ data: { status: "skipped", updatedAt: (/* @__PURE__ */ new Date()).toISOString() } });
+      await skip(id, "started");
       skipped += 1;
       console.log("[remind] skipped late", row.courseId, startTime, minutes);
+      entry.result = "skipped: \u5DF2\u7ECF\u5F00\u8BFE";
       continue;
     }
     const template = templateOf(row, fallback);
     if (!template) {
       console.error("[remind] no template", row.courseId);
+      await reminders().doc(id).update({ data: { lastError: "no template", triedAt: (/* @__PURE__ */ new Date()).toISOString() } });
+      entry.result = "error: \u6CA1\u6709\u6A21\u677F ID";
       continue;
     }
+    entry.templateId = template.id;
+    entry.fields = template.fields;
     try {
       await sendOne(
         template,
@@ -805,16 +826,23 @@ async function tickReminders() {
       );
       await reminders().doc(id).update({ data: { status: "sent", sentAt: (/* @__PURE__ */ new Date()).toISOString() } });
       sent += 1;
+      entry.result = "sent";
     } catch (error) {
       const code = Number(error.errCode ?? error.errcode ?? 0);
-      if (code === 43101) {
-        await reminders().doc(id).update({ data: { status: "noquota", updatedAt: (/* @__PURE__ */ new Date()).toISOString() } });
-      }
-      console.error("[remind] send failed", row.courseId, code || errorText(error));
+      const detail = errorText(error).trim();
+      await reminders().doc(id).update({
+        data: {
+          ...code === 43101 ? { status: "noquota" } : {},
+          lastError: detail,
+          triedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
+      console.error("[remind] send failed", row.courseId, detail);
+      entry.result = `error: ${detail}`;
     }
   }
   console.log(`[remind] sent=${sent} skipped=${skipped} pending=${rows.length}`);
-  return { sent, skipped };
+  return { sent, skipped, today, template: fallback, rows: report };
 }
 
 // cloudfunctions/remind/src/index.ts
@@ -822,7 +850,7 @@ import_wx_server_sdk2.default.init({ env: import_wx_server_sdk2.default.DYNAMIC_
 async function main(event) {
   console.log("[remind] invoke", (event == null ? void 0 : event.Type) || "manual", (event == null ? void 0 : event.TriggerName) || "");
   try {
-    return { ok: true, ...await tickReminders() };
+    return { ok: true, ...await tickReminders({ force: (event == null ? void 0 : event.force) === true }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "\u63D0\u9192\u626B\u63CF\u5931\u8D25";
     console.error("[remind]", message);

@@ -503,8 +503,27 @@ export const useFamilyStore = defineStore('family', {
     saveHomework(input: { id?: string; date: string; subject: string; content: string; note: string }) {
       return this.dispatch<string>('saveHomework', input)
     },
-    setHomeworkDone(id: string, done: boolean) {
-      return this.dispatch('setHomeworkDone', { id, done })
+    /** 先在本机改掉状态，界面立刻变；云端失败时只把这一条改回去，不动期间别的更新。 */
+    async setHomeworkDone(id: string, done: boolean) {
+      const previous = (this.snapshot.homework ?? []).find((item) => item.id === id)
+      const patch = (next: Homework | undefined) => {
+        if (!next) return
+        this.snapshot = frozen({
+          ...this.snapshot,
+          homework: (this.snapshot.homework ?? []).map((item) => (item.id === id ? next : item)),
+        })
+      }
+      if (previous) {
+        const { doneAt: _doneAt, ...rest } = previous
+        patch(done ? { ...rest, done, doneAt: new Date().toISOString() } : { ...rest, done })
+      }
+      try {
+        return await this.dispatch('setHomeworkDone', { id, done })
+      } catch (error) {
+        const current = (this.snapshot.homework ?? []).find((item) => item.id === id)
+        if (previous && current && current.done === done) patch(previous)
+        throw error
+      }
     },
     removeHomework(id: string) {
       return this.dispatch('removeHomework', { id })
