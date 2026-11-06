@@ -118,7 +118,7 @@ onMounted(measureSoon)
       <view class="quick-badge accent"><text class="badge-glyph">＋</text></view>
       <view>
         <text class="title">快速新增计划</text>
-        <text class="desc">选择日期、已有课程或临时计划</text>
+        <text class="desc">已有课程、临时计划或课堂作业</text>
       </view>
     </button>
     <button hover-class="press-on" hover-stay-time="80" class="quick-item" @click="quick('/subpages/course-edit/index')">
