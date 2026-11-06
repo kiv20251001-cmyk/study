@@ -3,7 +3,7 @@ import type { AppSnapshot, ChildAvatarKey } from '../../../../../server/src/doma
 import { createEmptyFamilySnapshot } from '../../../../../server/src/workspace/empty-snapshot'
 import { applyFamilyAction, FamilyActionError } from '../../../../../server/src/workspace/family-actions'
 import { createFamilyWorkspace, hourlyBillsNeedRefresh } from '../../../../../server/src/workspace/family-workspace'
-import { listReminders, resolveRemindTemplate, subscribeReminder } from '../../shared/remind'
+import { listReminders, resolveRemindTemplate, subscribeReminder } from '../../../cloud-shared/remind'
 import {
   canInviteRole,
   canLeaveFamily,

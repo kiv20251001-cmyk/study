@@ -24,7 +24,7 @@
 
 1. 用已绑定云开发的小程序登录 [mp.weixin.qq.com](https://mp.weixin.qq.com)。
 2. 「功能」→「订阅消息」→「公共模板库」，选用和上课提醒接近的模板。字段尽量是：课程名称、上课时间、上课地点、备注。
-3. 选用后四个字段按这个顺序：计划名称、开始时间、地点、备注，类型用 `thing`。云函数会读模板正文里的键名。只有自动识别失败时，才把模板 ID 写进 `apps/miniprogram/src/domain/remind.ts`。
+3. 选用后四个字段按这个顺序：计划名称、开始时间、地点、备注，类型用 `thing`。云函数会读模板正文里的键名。只有自动识别失败时，才把模板 ID 写进 `apps/miniprogram/src/domain/remind.config.json`。
 4. 确认开发环境和正式环境都已开通云函数。定时任务要部署到用户实际连接的那个环境（体验版连 `VITE_CLOUD_ENV_DEV`，正式版连 `VITE_CLOUD_ENV_PROD`）。
 
 怎样算做完：订阅消息列表里能看到选用的模板，并复制到了模板 ID。

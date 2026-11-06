@@ -703,7 +703,7 @@ const rows = computed(() => {
 .progress-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .progress-track { height: 5px; border-radius: 999px; overflow: hidden; }
 .progress-track view { height: 100%; border-radius: 999px; }
-.homework-block { margin-top: 6px; overflow: hidden; }
+.homework-block { margin-top: 6px; }
 .lesson-list + .homework-block { margin-top: 18px; }
 .homework-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; padding-left: 2px; }
 .homework-dot { width: 7px; height: 7px; border-radius: 50%; background: #6c63ff; box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.18); }

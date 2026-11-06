@@ -2,9 +2,9 @@ import cloud from 'wx-server-sdk'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
-import type { AppSnapshot } from '../../../../server/src/domain/types'
-import { occurrencesOnDate } from '../../../../server/src/domain/schedule'
-import { FamilyActionError } from '../../../../server/src/workspace/family-actions'
+import type { AppSnapshot } from '../../../server/src/domain/types'
+import { occurrencesOnDate } from '../../../server/src/domain/schedule'
+import { FamilyActionError } from '../../../server/src/workspace/family-actions'
 import {
   parseTemplateContent,
   REMIND_TEMPLATE_FIELDS,
@@ -12,7 +12,7 @@ import {
   remindFieldValue,
   type RemindFields,
   type RemindTemplate,
-} from '../../src/domain/remind'
+} from '../src/domain/remind'
 
 dayjs.extend(utc)
 dayjs.extend(timezone)

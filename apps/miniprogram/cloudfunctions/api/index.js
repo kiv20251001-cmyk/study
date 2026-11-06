@@ -2290,7 +2290,7 @@ function createFamilyWorkspace(initial) {
   };
 }
 
-// cloudfunctions/shared/remind.ts
+// cloud-shared/remind.ts
 var import_wx_server_sdk = __toESM(require("wx-server-sdk"));
 var import_dayjs7 = __toESM(require_dayjs_min());
 var import_utc = __toESM(require_utc());
@@ -2328,7 +2328,7 @@ function parseTemplateContent(content) {
   return null;
 }
 
-// cloudfunctions/shared/remind.ts
+// cloud-shared/remind.ts
 import_dayjs7.default.extend(import_utc.default);
 import_dayjs7.default.extend(import_timezone.default);
 import_wx_server_sdk.default.init({ env: import_wx_server_sdk.default.DYNAMIC_CURRENT_ENV });

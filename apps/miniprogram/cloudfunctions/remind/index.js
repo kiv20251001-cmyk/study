@@ -466,7 +466,7 @@ __export(index_exports, {
 module.exports = __toCommonJS(index_exports);
 var import_wx_server_sdk2 = __toESM(require("wx-server-sdk"));
 
-// cloudfunctions/shared/remind.ts
+// cloud-shared/remind.ts
 var import_wx_server_sdk = __toESM(require("wx-server-sdk"));
 var import_dayjs3 = __toESM(require_dayjs_min());
 var import_utc = __toESM(require_utc());
@@ -617,7 +617,7 @@ function parseTemplateContent(content) {
   return null;
 }
 
-// cloudfunctions/shared/remind.ts
+// cloud-shared/remind.ts
 import_dayjs3.default.extend(import_utc.default);
 import_dayjs3.default.extend(import_timezone.default);
 import_wx_server_sdk.default.init({ env: import_wx_server_sdk.default.DYNAMIC_CURRENT_ENV });

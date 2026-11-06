@@ -1,5 +1,5 @@
 import cloud from 'wx-server-sdk'
-import { tickReminders } from '../../shared/remind'
+import { tickReminders } from '../../../cloud-shared/remind'
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 

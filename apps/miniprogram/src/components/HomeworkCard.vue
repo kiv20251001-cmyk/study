@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import type { Homework } from '@server-domain/types'
 import { HOMEWORK_COLOR, HOMEWORK_DONE_COLOR } from '@/domain/homework'
 import { useThemeStore } from '@/utils/wx-theme'
-import { cardBackground, mix, tileBackground } from '@/utils/color'
+import { cardBackground, deepTone, mix, tileBackground } from '@/utils/color'
 import AppIcon from '@/components/AppIcon.vue'
 
 const ACTION_WIDTH = 144
@@ -157,7 +157,7 @@ function tapCard() {
           <text class="hw-subject">{{ homework.subject }}</text>
           <text v-if="!seal" class="hw-status" :class="status.cls">{{ status.text }}</text>
         </view>
-        <text class="hw-content" :class="{ clamp: !expanded }">{{ homework.content }}</text>
+        <view class="hw-content" :class="{ clamp: long && !expanded }">{{ homework.content }}</view>
         <text v-if="long" class="hw-more">{{ expanded ? '收起' : '展开全部' }}</text>
         <view v-if="homework.note" class="hw-note">
           <text class="hw-note-label">备注</text>
@@ -169,16 +169,16 @@ function tapCard() {
         <text>左滑</text>
       </view>
     </view>
-    <view v-if="!readonly" class="hw-clip" :style="look.clip">
+    <view v-if="!readonly && reveal > 0" class="hw-clip" :style="look.clip">
       <view class="hw-drawer" :style="look.drawer">
-        <button hover-class="press-on" hover-stay-time="80" class="hw-action edit" @click.stop="emit('edit')">
+        <view hover-class="press-on" hover-stay-time="80" class="hw-action edit" @click.stop="emit('edit')">
           <AppIcon name="edit" tone="white" :size="16" />
           <text>编辑</text>
-        </button>
-        <button hover-class="press-on" hover-stay-time="80" class="hw-action toggle" :class="{ undo2: homework.done }" @click.stop="emit('toggle')">
+        </view>
+        <view hover-class="press-on" hover-stay-time="80" class="hw-action toggle" :class="{ undo2: homework.done }" @click.stop="emit('toggle')">
           <AppIcon :name="homework.done ? 'undo' : 'check'" tone="white" :size="16" />
           <text>{{ homework.done ? '未完成' : '完成' }}</text>
-        </button>
+        </view>
       </view>
     </view>
   </view>
@@ -196,17 +196,14 @@ function tapCard() {
   z-index: 2;
   top: 0;
   right: 0;
-  bottom: 0;
+  height: 100%;
   overflow: hidden;
   border-radius: 0 22px 22px 0;
 }
 .hw-drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   width: 144px;
+  height: 100%;
   box-sizing: border-box;
   align-items: stretch;
   gap: 8px;
@@ -228,7 +225,6 @@ function tapCard() {
   font-weight: 700;
   line-height: 1;
 }
-.hw-action::after { border: 0; }
 .hw-action.edit {
   background: rgba(255, 255, 255, 0.22);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
